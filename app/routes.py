@@ -420,24 +420,16 @@ def check_updates():
 @bp.route('/api/get_qr')
 @login_required
 def get_qr():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado."}), 403
-    api_url = current_app.config['EVOLUTION_API_URL']
-    api_key = current_app.config['EVOLUTION_API_KEY']
-    instance = current_app.config['INSTANCE_NAME']
-    res = requests.get(f"{api_url}/instance/connect/{instance}", headers={"apikey": api_key}).json()
-    
-    if res.get('instance', {}).get('state') == 'open':
-        numero = ""
-        try:
-            state_res = requests.get(f"{api_url}/instance/connectionState/{instance}", headers={"apikey": api_key}).json()
-            owner = state_res.get('instance', {}).get('owner', '')
-            if owner: numero = owner.split('@')[0]
-        except Exception: pass
-        return jsonify({"status": "connected", "numero": numero})
+    res = requests.get(f"{current_app.config['EVOLUTION_API_URL']}/instance/connect/{current_app.config['INSTANCE_NAME']}", headers={"apikey": current_app.config['EVOLUTION_API_KEY']}).json()
+    if res.get('instance', {}).get('state') == 'open': 
+        return jsonify({"status": "connected"})
         
     b64 = res.get('base64') or (res.get('qrcode', {}).get('base64') if isinstance(res.get('qrcode'), dict) else None)
-    return jsonify({"status": "qr", "qr_base64": b64}) if b64 else jsonify({"erro": "A carregar..."}), 400
-
+    
+    if b64:
+        return jsonify({"status": "qr", "qr_base64": b64}), 200
+    else:
+        return jsonify({"erro": "A carregar..."}), 400
 @bp.route('/api/disconnect', methods=['POST'])
 @login_required
 def disconnect_whatsapp():
