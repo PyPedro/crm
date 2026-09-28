@@ -420,16 +420,30 @@ def check_updates():
 @bp.route('/api/get_qr')
 @login_required
 def get_qr():
-    res = requests.get(f"{current_app.config['EVOLUTION_API_URL']}/instance/connect/{current_app.config['INSTANCE_NAME']}", headers={"apikey": current_app.config['EVOLUTION_API_KEY']}).json()
-    if res.get('instance', {}).get('state') == 'open': 
-        return jsonify({"status": "connected"})
+    try:
+        res = requests.get(
+            f"{current_app.config['EVOLUTION_API_URL']}/instance/connect/{current_app.config['INSTANCE_NAME']}", 
+            headers={"apikey": current_app.config['EVOLUTION_API_KEY']}
+        ).json()
         
-    b64 = res.get('base64') or (res.get('qrcode', {}).get('base64') if isinstance(res.get('qrcode'), dict) else None)
-    
-    if b64:
-        return jsonify({"status": "qr", "qr_base64": b64}), 200
-    else:
-        return jsonify({"erro": "A carregar..."}), 400
+        # Isto vai imprimir a resposta real nos Logs do Render!
+        print("RESPOSTA HETZNER:", res)
+
+        if res.get('instance', {}).get('state') == 'open': 
+            return jsonify({"status": "connected"}), 200
+            
+        b64 = res.get('base64') or (res.get('qrcode', {}).get('base64') if isinstance(res.get('qrcode'), dict) else None)
+        
+        if b64:
+            return jsonify({"status": "qr", "qr_base64": b64}), 200
+        else:
+            # Em vez de Erro 400, dizemos ao navegador para apenas aguardar pacificamente
+            return jsonify({"status": "pending", "detalhe": "A aguardar QR Code da API"}), 200
+            
+    except Exception as e:
+        print("ERRO GET_QR:", e)
+        return jsonify({"status": "error", "erro": str(e)}), 200
+
 @bp.route('/api/disconnect', methods=['POST'])
 @login_required
 def disconnect_whatsapp():
