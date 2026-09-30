@@ -398,6 +398,11 @@ def update_deal_stage():
 @bp.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
     dados = request.json
+    remote_jid = dados.get('data', {}).get('key', {}).get('remoteJid', '')
+    if '@g.us' in remote_jid:
+        print("Webhook ignorado: mensagem de grupo.")
+        return jsonify({"status": "ignorado", "motivo": "Mensagem de grupo"}), 200
+
     nome_instancia = dados.get('instance') if dados else None
     empresa = Empresa.query.filter_by(instancia_whatsapp=nome_instancia).first()
     if not empresa:
