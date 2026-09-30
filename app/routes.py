@@ -1,6 +1,9 @@
 import os
 import requests
 import json
+import re
+import secrets
+import unicodedata
 from dotenv import load_dotenv, find_dotenv
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string
 from datetime import datetime
@@ -8,7 +11,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 
-from app.models import db, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao
+from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from google import genai
 from google.genai import types
@@ -19,6 +22,16 @@ bp = Blueprint('main', __name__)
 # --- FUNÇÃO PARA GERAR TOKENS SEGUROS ---
 def get_serializer():
     return URLSafeTimedSerializer(current_app.config.get('SECRET_KEY', 'optmiza-secure-key-2026'))
+
+
+def slug_instancia(nome_empresa):
+    normalizado = unicodedata.normalize('NFKD', nome_empresa).encode('ascii', 'ignore').decode('ascii')
+    base = re.sub(r'[^a-zA-Z0-9]+', '-', normalizado).strip('-').lower() or 'empresa'
+    return f"{base[:80]}-{secrets.token_hex(4)}"
+
+
+def evolution_headers():
+    return {"apikey": current_app.config['EVOLUTION_API_KEY']}
 
 # --- TEMPLATE HTML INJETÁVEL COM ASSINATURA (CONVITE E RESET) ---
 AUTH_HTML = """
@@ -69,18 +82,63 @@ AUTH_HTML = """
 </html>
 """
 
-# --- ROTAS DE AUTENTICAÇÃO PADRÃO ---
+# --- CADASTRO DE EMPRESA E AUTENTICAÇÃO ---
+@bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'GET':
+        return render_template('register.html')
+
+    nome_empresa = (request.form.get('nome_empresa') or '').strip()
+    username = (request.form.get('username') or '').strip()
+    password = request.form.get('password') or ''
+    if not nome_empresa or not username or not password:
+        return render_template('register.html', erro="Preencha todos os campos."), 400
+    if User.query.filter_by(username=username).first():
+        return render_template('register.html', erro="Este nome de utilizador já está em uso."), 409
+    if not current_app.config.get('EVOLUTION_API_KEY'):
+        return render_template('register.html', erro="A integração WhatsApp não está configurada."), 503
+
+    instancia = slug_instancia(nome_empresa)
+    api_url = current_app.config['EVOLUTION_API_URL'].rstrip('/')
+    try:
+        resposta = requests.post(
+            f"{api_url}/instance/create",
+            headers=evolution_headers(),
+            json={"instanceName": instancia, "qrcode": True, "integration": "WHATSAPP-BAILEYS"},
+            timeout=20,
+        )
+        resposta.raise_for_status()
+        webhook_url = current_app.config['EVOLUTION_WEBHOOK_URL']
+        resposta_webhook = requests.post(
+            f"{api_url}/webhook/set/{instancia}",
+            headers=evolution_headers(),
+            json={"webhook": {"enabled": True, "url": webhook_url, "events": ["MESSAGES_UPSERT"]}},
+            timeout=20,
+        )
+        resposta_webhook.raise_for_status()
+    except requests.RequestException:
+        return render_template('register.html', erro="Não foi possível configurar o WhatsApp. Tente novamente."), 502
+
+    empresa = Empresa(nome=nome_empresa, instancia_whatsapp=instancia)
+    db.session.add(empresa)
+    db.session.flush()
+    db.session.add(User(
+        empresa_id=empresa.id,
+        username=username,
+        password_hash=generate_password_hash(password),
+        is_admin=True,
+    ))
+    db.session.add_all([
+        Etapa(empresa_id=empresa.id, nome=nome)
+        for nome in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')
+    ])
+    db.session.add(Configuracao(empresa_id=empresa.id))
+    db.session.commit()
+    return redirect(url_for('main.login', msg="Empresa criada. Entre para continuar a configuração do WhatsApp."))
+
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if User.query.count() == 0:
-        admin = User(username='admin', password_hash=generate_password_hash('admin123'), is_admin=True)
-        db.session.add(admin)
-        if Etapa.query.count() == 0:
-            db.session.add_all([Etapa(nome='Qualificação'), Etapa(nome='Contato Feito'), Etapa(nome='Proposta Enviada'), Etapa(nome='Fechamento')])
-        if Configuracao.query.count() == 0:
-            db.session.add(Configuracao())
-        db.session.commit()
-
     msg_sucesso = request.args.get('msg')
     
     if request.method == 'POST':
@@ -110,7 +168,7 @@ def gerar_link_convite():
     is_admin = request.json.get('is_admin', False)
     s = get_serializer()
     # Cria um token válido por 24 horas
-    token = s.dumps({"is_admin": is_admin, "action": "invite"})
+    token = s.dumps({"is_admin": is_admin, "empresa_id": current_user.empresa_id, "action": "invite"})
     invite_url = url_for('main.processar_convite', token=token, _external=True)
     return jsonify({"link": invite_url})
 
@@ -130,7 +188,10 @@ def processar_convite(token):
         if User.query.filter_by(username=username).first():
             return render_template_string(AUTH_HTML, title="Criar Conta", subtitle="Junte-se à equipa Optmiza", action="invite", btn_text="Concluir Registo", erro="Este nome de utilizador já está em uso.")
             
-        novo_user = User(username=username, password_hash=generate_password_hash(password), is_admin=data['is_admin'])
+        empresa = db.session.get(Empresa, data.get('empresa_id'))
+        if not empresa:
+            return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="A empresa deste convite não existe.", erro="Solicite um novo link ao Administrador."), 404
+        novo_user = User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=data['is_admin'])
         db.session.add(novo_user)
         db.session.commit()
         return redirect(url_for('main.login', msg="Conta criada! Já pode fazer login."))
@@ -142,7 +203,7 @@ def processar_convite(token):
 def gerar_link_reset(id):
     if not current_user.is_admin:
         return jsonify({"erro": "Acesso negado"}), 403
-    user = db.session.get(User, id)
+    user = User.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
     if not user:
         return jsonify({"erro": "Utilizador não encontrado"}), 404
         
@@ -162,6 +223,8 @@ def processar_reset(token):
         return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="Este link de segurança expirou.", erro="Solicite um novo reset ao Administrador.")
 
     user = db.session.get(User, data['user_id'])
+    if not user:
+        return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="A conta não foi encontrada.", erro="Solicite um novo reset ao Administrador."), 404
     if request.method == 'POST':
         password = request.form.get('password')
         user.password_hash = generate_password_hash(password)
@@ -186,12 +249,12 @@ def gerir_usuarios():
         if User.query.filter_by(username=username).first():
             return jsonify({"erro": "Este nome de utilizador já existe"}), 400
 
-        novo_user = User(username=username, password_hash=generate_password_hash(password), is_admin=is_admin)
+        novo_user = User(empresa_id=current_user.empresa_id, username=username, password_hash=generate_password_hash(password), is_admin=is_admin)
         db.session.add(novo_user)
         db.session.commit()
         return jsonify({"status": "sucesso"})
 
-    users = User.query.all()
+    users = User.query.filter_by(empresa_id=current_user.empresa_id).all()
     return jsonify([{"id": u.id, "username": u.username, "is_admin": u.is_admin} for u in users])
 
 @bp.route('/api/usuarios/<int:id>', methods=['DELETE'])
@@ -199,9 +262,9 @@ def gerir_usuarios():
 def apagar_usuario(id):
     if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
     if id == current_user.id: return jsonify({"erro": "Não pode apagar a sua própria conta"}), 400
-    user = db.session.get(User, id)
+    user = User.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
     if user:
-        Negocio.query.filter_by(user_id=id).update({'user_id': None})
+        Negocio.query.filter_by(user_id=id, empresa_id=current_user.empresa_id).update({'user_id': None})
         db.session.delete(user)
         db.session.commit()
         return jsonify({"status": "sucesso"})
@@ -212,7 +275,9 @@ def apagar_usuario(id):
 @login_required
 def configuracoes():
     if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
-    config = Configuracao.query.first()
+    config = Configuracao.query.filter_by(empresa_id=current_user.empresa_id).first()
+    if not config:
+        return jsonify({"erro": "Configuração não encontrada"}), 404
     if request.method == 'POST':
         config.prompt_ia = request.json.get('prompt_ia', config.prompt_ia)
         db.session.commit()
@@ -223,10 +288,13 @@ def configuracoes():
 @login_required
 def assign_user():
     dados = request.json
-    negocio = db.session.get(Negocio, dados.get('negocio_id'))
+    negocio = Negocio.query.filter_by(id=dados.get('negocio_id'), empresa_id=current_user.empresa_id).first()
     if negocio:
         if current_user.is_admin:
-            negocio.user_id = dados.get('user_id') or None
+            user_id = dados.get('user_id') or None
+            if user_id and not User.query.filter_by(id=user_id, empresa_id=current_user.empresa_id).first():
+                return jsonify({"erro": "Utilizador não encontrado"}), 404
+            negocio.user_id = user_id
         else:
             negocio.user_id = current_user.id
         db.session.commit()
@@ -240,17 +308,18 @@ def gerir_etapas():
     if request.method == 'POST':
         nome = request.json.get('nome')
         if nome:
-            db.session.add(Etapa(nome=nome))
+            db.session.add(Etapa(empresa_id=current_user.empresa_id, nome=nome))
             db.session.commit()
             return jsonify({"status": "sucesso"})
         return jsonify({"erro": "Nome inválido"}), 400
-    return jsonify([{"id": e.id, "nome": e.nome, "qtd_negocios": len(e.negocios)} for e in Etapa.query.all()])
+    etapas = Etapa.query.filter_by(empresa_id=current_user.empresa_id).all()
+    return jsonify([{"id": e.id, "nome": e.nome, "qtd_negocios": len(e.negocios)} for e in etapas])
 
 @bp.route('/api/etapas/<int:id>', methods=['PUT', 'DELETE'])
 @login_required
 def editar_etapa(id):
     if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
-    etapa = db.session.get(Etapa, id)
+    etapa = Etapa.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
     if not etapa: return jsonify({"erro": "Etapa não encontrada"}), 404
     if request.method == 'PUT':
         etapa.nome = request.json.get('nome', etapa.nome)
@@ -266,16 +335,21 @@ def editar_etapa(id):
 @bp.route('/')
 @login_required
 def index():
-    return render_template('index.html', etapas=Etapa.query.all(), users=User.query.all() if current_user.is_admin else [])
+    etapas = Etapa.query.filter_by(empresa_id=current_user.empresa_id).all()
+    users = User.query.filter_by(empresa_id=current_user.empresa_id).all() if current_user.is_admin else []
+    return render_template('index.html', etapas=etapas, users=users)
 
 @bp.route('/api/get_chat/<int:pessoa_id>')
 @login_required
 def get_chat(pessoa_id):
-    pessoa = db.session.get(Pessoa, pessoa_id)
-    mensagens_nao_lidas = Mensagem.query.filter_by(pessoa_id=pessoa_id, tipo='inbound', lida=False).all()
+    pessoa = Pessoa.query.filter_by(id=pessoa_id, empresa_id=current_user.empresa_id).first()
+    if not pessoa:
+        return jsonify({"erro": "Pessoa não encontrada"}), 404
+    mensagens_nao_lidas = Mensagem.query.filter_by(pessoa_id=pessoa_id, empresa_id=current_user.empresa_id, tipo='inbound', lida=False).all()
     for msg in mensagens_nao_lidas: msg.lida = True
     db.session.commit()
-    formatadas = [{"direcao": m.tipo, "conteudo": m.mensagem, "hora": m.data_envio.strftime("%H:%M") if m.data_envio else ""} for m in pessoa.mensagens]
+    mensagens = Mensagem.query.filter_by(pessoa_id=pessoa.id, empresa_id=current_user.empresa_id).order_by(Mensagem.data_envio).all()
+    formatadas = [{"direcao": m.tipo, "conteudo": m.mensagem, "hora": m.data_envio.strftime("%H:%M") if m.data_envio else ""} for m in mensagens]
     return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": formatadas})
 
 @bp.route('/api/send_message', methods=['POST'])
@@ -283,12 +357,15 @@ def get_chat(pessoa_id):
 def send_message():
     dados = request.json
     pessoa_id = dados.get('pessoa_id') 
-    numero = dados.get('numero')
+    pessoa = Pessoa.query.filter_by(id=pessoa_id, empresa_id=current_user.empresa_id).first()
+    if not pessoa:
+        return jsonify({"erro": "Pessoa não encontrada"}), 404
+    numero = pessoa.telefone
     texto = dados.get('texto', '')
     media_b64 = dados.get('media')
     api_url = current_app.config['EVOLUTION_API_URL']
     api_key = current_app.config['EVOLUTION_API_KEY']
-    instance_name = current_app.config['INSTANCE_NAME']
+    instance_name = current_user.empresa.instancia_whatsapp
 
     if media_b64:
         header, encoded = media_b64.split(",", 1)
@@ -296,12 +373,12 @@ def send_message():
         mtype = 'image' if 'image' in mimetype else 'audio' if 'audio' in mimetype else 'video' if 'video' in mimetype else 'document'
         res = requests.post(f"{api_url}/message/sendMedia/{instance_name}", headers={"apikey": api_key}, json={"number": numero, "mediatype": mtype, "mimetype": mimetype, "caption": texto, "media": encoded, "fileName": dados.get('fileName', 'arquivo')})
         if res.status_code in [200, 201]:
-            db.session.add(Mensagem(pessoa_id=pessoa_id, mensagem=json.dumps({"type": mtype, "content": media_b64, "caption": texto}), tipo='outbound', data_envio=datetime.now()))
+            db.session.add(Mensagem(empresa_id=current_user.empresa_id, pessoa_id=pessoa_id, mensagem=json.dumps({"type": mtype, "content": media_b64, "caption": texto}), tipo='outbound', data_envio=datetime.now()))
             db.session.commit()
             return jsonify({"status": "sucesso"})
     else:
-        if enviar_mensagem_whatsapp(numero, texto):
-            db.session.add(Mensagem(pessoa_id=pessoa_id, mensagem=texto, tipo='outbound', data_envio=datetime.now()))
+        if enviar_mensagem_whatsapp(numero, texto, instance_name):
+            db.session.add(Mensagem(empresa_id=current_user.empresa_id, pessoa_id=pessoa_id, mensagem=texto, tipo='outbound', data_envio=datetime.now()))
             db.session.commit()
             return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Falha no envio"}), 500
@@ -309,9 +386,10 @@ def send_message():
 @bp.route('/api/update_deal_stage', methods=['POST'])
 @login_required
 def update_deal_stage():
-    negocio = db.session.get(Negocio, request.json.get('negocio_id'))
-    if negocio:
-        negocio.etapa_id = request.json.get('nova_etapa_id')
+    negocio = Negocio.query.filter_by(id=request.json.get('negocio_id'), empresa_id=current_user.empresa_id).first()
+    etapa = Etapa.query.filter_by(id=request.json.get('nova_etapa_id'), empresa_id=current_user.empresa_id).first()
+    if negocio and etapa:
+        negocio.etapa_id = etapa.id
         db.session.commit()
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Não encontrado"}), 404
@@ -320,6 +398,10 @@ def update_deal_stage():
 @bp.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
     dados = request.json
+    nome_instancia = dados.get('instance') if dados else None
+    empresa = Empresa.query.filter_by(instancia_whatsapp=nome_instancia).first()
+    if not empresa:
+        return jsonify({"erro": "Instância ou empresa não encontrada"}), 404
     if dados.get('event') not in ['MESSAGES_UPSERT', 'messages.upsert']: return jsonify({"status": "ignorado"}), 200
         
     try:
@@ -342,18 +424,21 @@ def webhook_whatsapp():
         if is_media and not texto_recebido: texto_recebido = "[Ficheiro Multimédia]"
 
         if telefone_remetente and (texto_recebido or is_media):
-            pessoa = Pessoa.query.filter_by(telefone=telefone_remetente).first()
+            pessoa = Pessoa.query.filter_by(empresa_id=empresa.id, telefone=telefone_remetente).first()
             if not pessoa:
-                pessoa = Pessoa(nome=nome_contato, telefone=telefone_remetente)
+                pessoa = Pessoa(empresa_id=empresa.id, nome=nome_contato, telefone=telefone_remetente)
                 db.session.add(pessoa)
                 db.session.commit()
-                db.session.add(Negocio(titulo=f"Op. - {telefone_remetente}", pessoa_id=pessoa.id, etapa_id=Etapa.query.first().id, user_id=None))
+                primeira_etapa = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).first()
+                if not primeira_etapa:
+                    return jsonify({"erro": "A empresa não possui etapas configuradas"}), 500
+                db.session.add(Negocio(empresa_id=empresa.id, titulo=f"Op. - {telefone_remetente}", pessoa_id=pessoa.id, etapa_id=primeira_etapa.id, user_id=None))
                 db.session.commit()
 
             msg_db = texto_recebido
             if is_media:
                 try:
-                    res_media = requests.post(f"{current_app.config['EVOLUTION_API_URL']}/chat/getBase64FromMediaMessage/{current_app.config['INSTANCE_NAME']}", headers={"apikey": current_app.config['EVOLUTION_API_KEY']}, json={"message": data_payload})
+                    res_media = requests.post(f"{current_app.config['EVOLUTION_API_URL']}/chat/getBase64FromMediaMessage/{nome_instancia}", headers=evolution_headers(), json={"message": data_payload})
                     if res_media.status_code in [200, 201]:
                         b64 = res_media.json().get('base64')
                         if b64 and not b64.startswith('data:'):
@@ -362,17 +447,17 @@ def webhook_whatsapp():
                         msg_db = json.dumps({"type": media_type, "content": b64, "caption": texto_recebido})
                 except: pass
 
-            db.session.add(Mensagem(pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
+            db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
             db.session.commit()
 
             # IA Triage com NOVO google.genai e Fallback de Segurança
             try:
                 chave_gemini = os.environ.get('GEMINI_API_KEY')
                 client = genai.Client(api_key=chave_gemini)
-                config = Configuracao.query.first()
+                config = Configuracao.query.filter_by(empresa_id=empresa.id).first()
                 sys_inst = config.prompt_ia if config and config.prompt_ia else "Atuas como assistente virtual. Transfira para um humano se necessário usando [TRANSFERIR]."
 
-                ultimas = Mensagem.query.filter_by(pessoa_id=pessoa.id).order_by(Mensagem.id.desc()).limit(6).all()
+                ultimas = Mensagem.query.filter_by(empresa_id=empresa.id, pessoa_id=pessoa.id).order_by(Mensagem.id.desc()).limit(6).all()
                 ultimas.reverse()
                 historico = []
                 for m in ultimas[:-1]:
@@ -390,16 +475,18 @@ def webhook_whatsapp():
 
                 if "[TRANSFERIR]" in resposta_bot:
                     resposta_bot = resposta_bot.replace("[TRANSFERIR]", "").strip() or "Vou transferir a conversa para um consultor."
-                    negocio = Negocio.query.filter_by(pessoa_id=pessoa.id).first()
-                    if negocio and negocio.etapa_id == Etapa.query.first().id:
-                        negocio.etapa_id = Etapa.query.filter_by(nome='Contato Feito').first().id
+                    negocio = Negocio.query.filter_by(empresa_id=empresa.id, pessoa_id=pessoa.id).first()
+                    primeira_etapa = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).first()
+                    etapa_contato = Etapa.query.filter_by(empresa_id=empresa.id, nome='Contato Feito').first()
+                    if negocio and primeira_etapa and etapa_contato and negocio.etapa_id == primeira_etapa.id:
+                        negocio.etapa_id = etapa_contato.id
                         db.session.commit()
             except Exception as e:
                 resposta_bot = "Olá! A nossa assistente virtual está temporariamente indisponível. Um consultor assumirá o atendimento."
 
             if resposta_bot:
-                enviar_mensagem_whatsapp(telefone_remetente, resposta_bot)
-                db.session.add(Mensagem(pessoa_id=pessoa.id, mensagem=resposta_bot, tipo='outbound', data_envio=datetime.now()))
+                enviar_mensagem_whatsapp(telefone_remetente, resposta_bot, nome_instancia)
+                db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=resposta_bot, tipo='outbound', data_envio=datetime.now()))
                 db.session.commit()
 
     except Exception as e: print(f"Erro Webhook: {e}")
@@ -409,7 +496,7 @@ def webhook_whatsapp():
 @bp.route('/api/check_updates')
 @login_required
 def check_updates():
-    ultima_msg = Mensagem.query.order_by(Mensagem.id.desc()).first()
+    ultima_msg = Mensagem.query.filter_by(empresa_id=current_user.empresa_id).order_by(Mensagem.id.desc()).first()
     if ultima_msg:
         txt = ultima_msg.mensagem
         try: txt = f"📎 [Ficheiro] {json.loads(txt).get('caption', '')}"
@@ -422,7 +509,7 @@ def check_updates():
 def get_qr():
     try:
         res = requests.get(
-            f"{current_app.config['EVOLUTION_API_URL']}/instance/connect/{current_app.config['INSTANCE_NAME']}", 
+            f"{current_app.config['EVOLUTION_API_URL']}/instance/connect/{current_user.empresa.instancia_whatsapp}",
             headers={"apikey": current_app.config['EVOLUTION_API_KEY']}
         ).json()
         
@@ -448,24 +535,28 @@ def get_qr():
 @login_required
 def disconnect_whatsapp():
     if not current_user.is_admin: return jsonify({"erro": "Acesso negado."}), 403
-    requests.delete(f"{current_app.config['EVOLUTION_API_URL']}/instance/logout/{current_app.config['INSTANCE_NAME']}", headers={"apikey": current_app.config['EVOLUTION_API_KEY']})
+    requests.delete(f"{current_app.config['EVOLUTION_API_URL']}/instance/logout/{current_user.empresa.instancia_whatsapp}", headers=evolution_headers())
     return jsonify({"status": "desconectado"})
 
 @bp.route('/api/metrics')
 @login_required
 def metrics():
-    q_negocios = Negocio.query if current_user.is_admin else Negocio.query.filter_by(user_id=current_user.id)
+    q_negocios = Negocio.query.filter_by(empresa_id=current_user.empresa_id)
+    if not current_user.is_admin:
+        q_negocios = q_negocios.filter_by(user_id=current_user.id)
     total = q_negocios.count()
     funil, fechamentos = [], 0
     
-    for e in Etapa.query.all():
+    etapas = Etapa.query.filter_by(empresa_id=current_user.empresa_id).all()
+    for e in etapas:
         qtd = q_negocios.filter_by(etapa_id=e.id).count()
         if 'fechamento' in e.nome.lower() or 'ganho' in e.nome.lower(): fechamentos += qtd
         funil.append({"nome": e.nome, "quantidade": qtd, "porcentagem": (qtd/total*100) if total>0 else 0})
 
     tempos = []
-    for pessoa in Pessoa.query.all():
-        msgs = Mensagem.query.filter_by(pessoa_id=pessoa.id).order_by(Mensagem.data_envio).all()
+    pessoas = Pessoa.query.filter_by(empresa_id=current_user.empresa_id).all()
+    for pessoa in pessoas:
+        msgs = Mensagem.query.filter_by(empresa_id=current_user.empresa_id, pessoa_id=pessoa.id).order_by(Mensagem.data_envio).all()
         hin = None
         for m in msgs:
             if not m.data_envio: continue

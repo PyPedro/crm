@@ -1,12 +1,10 @@
 import requests
 from flask import current_app
 
-def enviar_mensagem_whatsapp(numero, texto):
+def enviar_mensagem_whatsapp(numero, texto, instance_name):
     # Pega as credenciais automaticamente da configuração do Flask (que lê do .env)
     api_url = current_app.config['EVOLUTION_API_URL']
     api_key = current_app.config['EVOLUTION_API_KEY']
-    instance_name = current_app.config['INSTANCE_NAME']
-    
     url = f"{api_url}/message/sendText/{instance_name}"
     headers = {
         "apikey": api_key,
