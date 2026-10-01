@@ -1,0 +1,39 @@
+<aside class="z-20 flex w-16 shrink-0 flex-col border-r border-white/10 bg-[#101b22] py-5 text-white md:w-60">
+    <a href="{{ url_for('main.index') }}" class="mx-auto mb-7 flex h-10 w-10 items-center justify-center rounded-xl bg-[#d3f36b] text-lg font-extrabold text-[#16382e] md:mx-5 md:w-auto md:justify-start md:gap-3 md:px-3" aria-label="Optmiza CRM">
+        <span>O</span><span class="hidden text-xs tracking-wide md:inline">OPTMIZA <span class="font-normal text-white/55">CRM</span></span>
+    </a>
+    <nav aria-label="Navegação principal" class="flex flex-1 flex-col gap-1 px-2 md:px-3">
+        <button type="button" onclick="abrirDashboard()" title="Dashboard" class="flex min-h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zm10-12h8V3h-8v6z"/></svg>
+            <span class="hidden md:inline">Dashboard</span>
+        </button>
+        <a href="#kanban-board" title="Funil de Vendas" class="flex min-h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h6v14H4zM14 5h6v8h-6zM14 17h6v2h-6z"/></svg>
+            <span class="hidden md:inline">Funil de Vendas</span>
+        </a>
+        <a href="#kanban-board" title="Chat WhatsApp" class="flex min-h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11.5a7.5 7.5 0 01-11.1 6.6L4 20l1.9-4.9A7.5 7.5 0 1120 11.5z"/></svg>
+            <span class="hidden md:inline">Chat WhatsApp</span>
+        </a>
+        {% if current_user.is_admin %}
+        <button type="button" onclick="abrirConfigIA()" title="Configurações" class="flex min-h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM19.4 15a1.7 1.7 0 00.3 1.9l.1.1-1.7 2.9-.2-.1a1.7 1.7 0 00-1.8.2l-.1.1h-3.4l-.1-.2a1.7 1.7 0 00-1.5-1l-.2.1-2.9-1.7.1-.2a1.7 1.7 0 00-.2-1.8l-.1-.1v-3.4l.2-.1a1.7 1.7 0 001-1.5l-.1-.2 1.7-2.9.2.1a1.7 1.7 0 001.8-.2l.1-.1h3.4l.1.2a1.7 1.7 0 001.5 1l.2-.1 2.9 1.7-.1.2a1.7 1.7 0 00.2 1.8l.1.1V15z"/></svg>
+            <span class="hidden md:inline">Configurações</span>
+        </button>
+        <div class="my-3 h-px bg-white/10"></div>
+        <button type="button" onclick="abrirModalFunil()" title="Configurar etapas" class="flex min-h-10 items-center justify-center gap-3 rounded-lg px-3 text-xs text-slate-400 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <span class="hidden md:inline">Configurar etapas</span><span class="md:hidden">Etapas</span>
+        </button>
+        <button type="button" onclick="abrirModalEquipa()" title="Gerenciar equipe" class="flex min-h-10 items-center justify-center gap-3 rounded-lg px-3 text-xs text-slate-400 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <span class="hidden md:inline">Gerenciar equipe</span><span class="md:hidden">Equipe</span>
+        </button>
+        <button type="button" onclick="abrirModalQR()" title="Conectar WhatsApp" class="flex min-h-10 items-center justify-center gap-3 rounded-lg px-3 text-xs text-slate-400 transition hover:bg-white/5 hover:text-white md:justify-start">
+            <span class="hidden md:inline">Conectar WhatsApp</span><span class="md:hidden">Conectar</span>
+        </button>
+        {% endif %}
+    </nav>
+    <a href="{{ url_for('main.logout') }}" title="Sair" class="mx-2 flex min-h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-400 transition hover:bg-rose-400/10 hover:text-rose-200 md:mx-3 md:justify-start">
+        <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m-4-4l4-5-4-5m4 5H3"/></svg>
+        <span class="hidden md:inline">Sair</span>
+    </a>
+</aside>

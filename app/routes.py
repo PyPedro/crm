@@ -11,6 +11,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 
+from app import oauth
 from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from google import genai
@@ -32,6 +33,29 @@ def slug_instancia(nome_empresa):
 
 def evolution_headers():
     return {"apikey": current_app.config['EVOLUTION_API_KEY']}
+
+
+def configurar_instancia_whatsapp(nome_empresa):
+    if not current_app.config.get('EVOLUTION_API_KEY'):
+        raise RuntimeError('A integração WhatsApp não está configurada.')
+
+    instancia = slug_instancia(nome_empresa)
+    api_url = current_app.config['EVOLUTION_API_URL'].rstrip('/')
+    resposta = requests.post(
+        f"{api_url}/instance/create",
+        headers=evolution_headers(),
+        json={"instanceName": instancia, "qrcode": True, "integration": "WHATSAPP-BAILEYS"},
+        timeout=20,
+    )
+    resposta.raise_for_status()
+    resposta_webhook = requests.post(
+        f"{api_url}/webhook/set/{instancia}",
+        headers=evolution_headers(),
+        json={"webhook": {"enabled": True, "url": current_app.config['EVOLUTION_WEBHOOK_URL'], "events": ["MESSAGES_UPSERT"]}},
+        timeout=20,
+    )
+    resposta_webhook.raise_for_status()
+    return instancia
 
 # --- TEMPLATE HTML INJETÁVEL COM ASSINATURA (CONVITE E RESET) ---
 AUTH_HTML = """
@@ -95,27 +119,10 @@ def register():
         return render_template('register.html', erro="Preencha todos os campos."), 400
     if User.query.filter_by(username=username).first():
         return render_template('register.html', erro="Este nome de utilizador já está em uso."), 409
-    if not current_app.config.get('EVOLUTION_API_KEY'):
-        return render_template('register.html', erro="A integração WhatsApp não está configurada."), 503
-
-    instancia = slug_instancia(nome_empresa)
-    api_url = current_app.config['EVOLUTION_API_URL'].rstrip('/')
     try:
-        resposta = requests.post(
-            f"{api_url}/instance/create",
-            headers=evolution_headers(),
-            json={"instanceName": instancia, "qrcode": True, "integration": "WHATSAPP-BAILEYS"},
-            timeout=20,
-        )
-        resposta.raise_for_status()
-        webhook_url = current_app.config['EVOLUTION_WEBHOOK_URL']
-        resposta_webhook = requests.post(
-            f"{api_url}/webhook/set/{instancia}",
-            headers=evolution_headers(),
-            json={"webhook": {"enabled": True, "url": webhook_url, "events": ["MESSAGES_UPSERT"]}},
-            timeout=20,
-        )
-        resposta_webhook.raise_for_status()
+        instancia = configurar_instancia_whatsapp(nome_empresa)
+    except RuntimeError as erro:
+        return render_template('register.html', erro=str(erro)), 503
     except requests.RequestException:
         return render_template('register.html', erro="Não foi possível configurar o WhatsApp. Tente novamente."), 502
 
@@ -151,6 +158,69 @@ def login():
         return render_template('login.html', erro="Credenciais inválidas")
         
     return render_template('login.html', msg=msg_sucesso)
+
+
+@bp.route('/login/google')
+def login_google():
+    if not current_app.config.get('GOOGLE_CLIENT_ID') or not current_app.config.get('GOOGLE_CLIENT_SECRET'):
+        return redirect(url_for('main.login', msg='O acesso com Google ainda não está configurado.'))
+    callback_url = current_app.config.get('GOOGLE_REDIRECT_URI') or url_for('main.authorize_google', _external=True)
+    return oauth.google.authorize_redirect(callback_url)
+
+
+@bp.route('/authorize/google')
+def authorize_google():
+    try:
+        token = oauth.google.authorize_access_token()
+        perfil = token.get('userinfo') or oauth.google.userinfo() or {}
+    except Exception:
+        return redirect(url_for('main.login', msg='Não foi possível autenticar com o Google. Tente novamente.'))
+
+    email = (perfil.get('email') or '').strip().lower()
+    google_id = perfil.get('sub')
+    nome = (perfil.get('name') or email.split('@')[0] or 'Nova empresa').strip()
+    if not email or not google_id or not perfil.get('email_verified'):
+        return redirect(url_for('main.login', msg='O Google não confirmou um endereço de e-mail válido.'))
+
+    user = User.query.filter_by(google_id=google_id).first()
+    if not user:
+        user = User.query.filter_by(email=email).first()
+    if user:
+        if user.google_id and user.google_id != google_id:
+            return redirect(url_for('main.login', msg='Este e-mail está associado a outra conta Google.'))
+        if not user.google_id:
+            user.google_id = google_id
+            db.session.commit()
+        login_user(user)
+        return redirect(url_for('main.index'))
+
+    try:
+        instancia = configurar_instancia_whatsapp(f'Empresa de {nome}')
+    except (RuntimeError, requests.RequestException):
+        return redirect(url_for('main.login', msg='Não foi possível preparar o WhatsApp para a nova empresa. Tente novamente.'))
+
+    empresa = Empresa(nome=f'Empresa de {nome}'[:120], instancia_whatsapp=instancia)
+    db.session.add(empresa)
+    db.session.flush()
+    username_base = re.sub(r'[^a-zA-Z0-9_.-]+', '', email.split('@')[0])[:40] or 'google'
+    username = f'{username_base}-{secrets.token_hex(3)}'
+    novo_user = User(
+        empresa_id=empresa.id,
+        username=username,
+        email=email,
+        google_id=google_id,
+        password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+        is_admin=True,
+    )
+    db.session.add(novo_user)
+    db.session.add_all([
+        Etapa(empresa_id=empresa.id, nome=etapa)
+        for etapa in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')
+    ])
+    db.session.add(Configuracao(empresa_id=empresa.id))
+    db.session.commit()
+    login_user(novo_user)
+    return redirect(url_for('main.index'))
 
 @bp.route('/logout')
 @login_required
@@ -454,6 +524,16 @@ def webhook_whatsapp():
 
             db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
             db.session.commit()
+
+            try:
+                requests.post(
+                    f"{current_app.config['EVOLUTION_API_URL'].rstrip('/')}/chat/sendPresence/{nome_instancia}",
+                    headers=evolution_headers(),
+                    json={"number": telefone_remetente, "presence": "composing", "delay": 2000},
+                    timeout=10,
+                ).raise_for_status()
+            except requests.RequestException as erro:
+                current_app.logger.warning('Não foi possível enviar presença de digitação: %s', erro)
 
             # IA Triage com NOVO google.genai e Fallback de Segurança
             try:
