@@ -9,6 +9,7 @@ class Empresa(db.Model):
     nome = db.Column(db.String(120), nullable=False)
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_ativa = db.Column(db.Boolean, default=True, nullable=False)
 
     users = db.relationship('User', backref='empresa', cascade='all, delete-orphan', lazy=True)
     etapas = db.relationship('Etapa', backref='empresa', cascade='all, delete-orphan', lazy=True)
@@ -25,6 +26,7 @@ class User(UserMixin, db.Model):
     google_id = db.Column(db.String(255), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    is_super_admin = db.Column(db.Boolean, default=False, nullable=False)
     negocios = db.relationship('Negocio', backref='atendente', lazy=True)
 
 class Pessoa(db.Model):

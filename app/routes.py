@@ -5,7 +5,7 @@ import re
 import secrets
 import unicodedata
 from dotenv import load_dotenv, find_dotenv
-from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string
+from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session
 from datetime import datetime
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -19,6 +19,23 @@ from google.genai import types
 
 load_dotenv(find_dotenv(), override=True)
 bp = Blueprint('main', __name__)
+
+
+@bp.before_app_request
+def bloquear_empresa_suspensa():
+    if not current_user.is_authenticated:
+        return None
+
+    if current_user.is_super_admin and request.endpoint in {
+        'main.optmiza_master', 'main.toggle_empresa'
+    }:
+        return None
+
+    if not current_user.empresa.is_ativa:
+        logout_user()
+        return 'Conta suspensa. Contacte o suporte.', 403
+
+    return None
 
 # --- FUNÇÃO PARA GERAR TOKENS SEGUROS ---
 def get_serializer():
@@ -153,6 +170,8 @@ def login():
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
+            if not user.empresa.is_ativa:
+                return render_template('login.html', erro='Conta suspensa. Contacte o suporte.'), 403
             login_user(user)
             return redirect(url_for('main.index'))
         return render_template('login.html', erro="Credenciais inválidas")
@@ -188,6 +207,8 @@ def authorize_google():
     if user:
         if user.google_id and user.google_id != google_id:
             return redirect(url_for('main.login', msg='Este e-mail está associado a outra conta Google.'))
+        if not user.empresa.is_ativa:
+            return redirect(url_for('main.login', msg='Conta suspensa. Contacte o suporte.'))
         if not user.google_id:
             user.google_id = google_id
             db.session.commit()
@@ -227,6 +248,45 @@ def authorize_google():
 def logout():
     logout_user()
     return redirect(url_for('main.login'))
+
+
+@bp.route('/optmiza-master', methods=['GET'])
+def optmiza_master():
+    if not current_user.is_authenticated or not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
+
+    empresas = Empresa.query.all()
+    total_usuarios = dict(
+        db.session.query(User.empresa_id, db.func.count(User.id))
+        .group_by(User.empresa_id)
+        .all()
+    )
+    csrf_token = session.setdefault('master_csrf_token', secrets.token_urlsafe(32))
+    return render_template(
+        'master.html',
+        empresas=empresas,
+        total_usuarios=total_usuarios,
+        csrf_token=csrf_token,
+    )
+
+
+@bp.route('/optmiza-master/empresa/<int:id>/toggle', methods=['POST'])
+def toggle_empresa(id):
+    if not current_user.is_authenticated or not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
+
+    token_enviado = request.form.get('csrf_token', '')
+    token_sessao = session.get('master_csrf_token', '')
+    if not token_sessao or not secrets.compare_digest(token_enviado, token_sessao):
+        return 'Requisição inválida.', 400
+
+    empresa = db.session.get(Empresa, id)
+    if not empresa:
+        return 'Empresa não encontrada.', 404
+
+    empresa.is_ativa = not empresa.is_ativa
+    db.session.commit()
+    return redirect(url_for('main.optmiza_master'))
 
 # --- ROTAS DE SEGURANÇA: CONVITES E RESET DE SENHA ---
 @bp.route('/api/invite', methods=['POST'])
@@ -477,6 +537,8 @@ def webhook_whatsapp():
     empresa = Empresa.query.filter_by(instancia_whatsapp=nome_instancia).first()
     if not empresa:
         return jsonify({"erro": "Instância ou empresa não encontrada"}), 404
+    if not empresa.is_ativa:
+        return jsonify({"erro": "Conta suspensa. Contacte o suporte."}), 403
     if dados.get('event') not in ['MESSAGES_UPSERT', 'messages.upsert']: return jsonify({"status": "ignorado"}), 200
         
     try:
