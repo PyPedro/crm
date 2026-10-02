@@ -4,6 +4,7 @@ import json
 import re
 import secrets
 import unicodedata
+import math
 from dotenv import load_dotenv, find_dotenv
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session
 from datetime import datetime
@@ -12,7 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 
 from app import oauth
-from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao
+from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from google import genai
 from google.genai import types
@@ -469,6 +470,52 @@ def index():
     users = User.query.filter_by(empresa_id=current_user.empresa_id).all() if current_user.is_admin else []
     return render_template('index.html', etapas=etapas, users=users)
 
+
+@bp.route('/api/leads', methods=['POST'])
+@login_required
+def criar_lead():
+    dados = request.get_json(silent=True) or {}
+    nome = (dados.get('nome') or '').strip()
+    telefone = re.sub(r'\D', '', str(dados.get('telefone') or ''))
+    titulo = (dados.get('titulo') or '').strip()
+    if not nome or len(nome) > 100 or not telefone or len(telefone) > 20:
+        return jsonify({"erro": "Informe um nome e um telefone válido."}), 400
+
+    try:
+        valor = float(dados.get('valor') or 0)
+    except (TypeError, ValueError):
+        return jsonify({"erro": "O valor do lead é inválido."}), 400
+    if not math.isfinite(valor) or valor < 0:
+        return jsonify({"erro": "O valor do lead deve ser zero ou maior."}), 400
+
+    etapa_id = dados.get('etapa_id')
+    try:
+        etapa_id = int(etapa_id) if etapa_id else None
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Etapa inválida."}), 400
+    etapa = Etapa.query.filter_by(id=etapa_id, empresa_id=current_user.empresa_id).first() if etapa_id else Etapa.query.filter_by(empresa_id=current_user.empresa_id).order_by(Etapa.id).first()
+    if not etapa:
+        return jsonify({"erro": "Etapa não encontrada. Cadastre uma etapa antes de criar leads."}), 400
+
+    pessoa = Pessoa.query.filter_by(empresa_id=current_user.empresa_id, telefone=telefone).first()
+    if not pessoa:
+        pessoa = Pessoa(empresa_id=current_user.empresa_id, nome=nome, telefone=telefone)
+        db.session.add(pessoa)
+        db.session.flush()
+
+    negocio = Negocio(
+        empresa_id=current_user.empresa_id,
+        titulo=(titulo or f"Lead - {nome}")[:100],
+        valor=valor,
+        pessoa_id=pessoa.id,
+        etapa_id=etapa.id,
+        user_id=current_user.id,
+    )
+    db.session.add(negocio)
+    db.session.commit()
+    return jsonify({"status": "sucesso", "lead_id": negocio.id, "pessoa_id": pessoa.id}), 201
+
+
 @bp.route('/api/get_chat/<int:pessoa_id>')
 @login_required
 def get_chat(pessoa_id):
@@ -480,7 +527,73 @@ def get_chat(pessoa_id):
     db.session.commit()
     mensagens = Mensagem.query.filter_by(pessoa_id=pessoa.id, empresa_id=current_user.empresa_id).order_by(Mensagem.data_envio).all()
     formatadas = [{"direcao": m.tipo, "conteudo": m.mensagem, "hora": m.data_envio.strftime("%H:%M") if m.data_envio else ""} for m in mensagens]
-    return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": formatadas})
+    etiquetas = [{"id": etiqueta.id, "nome": etiqueta.nome} for etiqueta in pessoa.etiquetas]
+    return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": formatadas, "etiquetas": etiquetas, "ia_ativa": pessoa.ia_ativa})
+
+
+@bp.route('/api/etiquetas', methods=['GET', 'POST'])
+@login_required
+def gerir_etiquetas():
+    if request.method == 'GET':
+        etiquetas = Etiqueta.query.filter_by(empresa_id=current_user.empresa_id).order_by(Etiqueta.nome).all()
+        return jsonify([{"id": etiqueta.id, "nome": etiqueta.nome} for etiqueta in etiquetas])
+
+    dados = request.get_json(silent=True) or {}
+    nome = (dados.get('nome') or '').strip()
+    if not nome or len(nome) > 40:
+        return jsonify({"erro": "A etiqueta deve ter entre 1 e 40 caracteres."}), 400
+    existente = Etiqueta.query.filter(
+        Etiqueta.empresa_id == current_user.empresa_id,
+        db.func.lower(Etiqueta.nome) == nome.lower(),
+    ).first()
+    if existente:
+        return jsonify({"erro": "Já existe uma etiqueta com esse nome."}), 409
+
+    etiqueta = Etiqueta(empresa_id=current_user.empresa_id, nome=nome)
+    db.session.add(etiqueta)
+    db.session.commit()
+    return jsonify({"id": etiqueta.id, "nome": etiqueta.nome}), 201
+
+
+@bp.route('/api/conversas/<int:pessoa_id>/etiquetas', methods=['PUT'])
+@login_required
+def atualizar_etiquetas_conversa(pessoa_id):
+    dados = request.get_json(silent=True) or {}
+    pessoa = Pessoa.query.filter_by(id=pessoa_id, empresa_id=current_user.empresa_id).first()
+    if not pessoa:
+        return jsonify({"erro": "Conversa não encontrada."}), 404
+
+    etiqueta = Etiqueta.query.filter_by(
+        id=dados.get('etiqueta_id'), empresa_id=current_user.empresa_id
+    ).first()
+    if not etiqueta:
+        return jsonify({"erro": "Etiqueta não encontrada."}), 404
+
+    acao = dados.get('acao', 'adicionar')
+    if acao == 'adicionar' and etiqueta not in pessoa.etiquetas:
+        pessoa.etiquetas.append(etiqueta)
+    elif acao == 'remover':
+        pessoa.etiquetas.remove(etiqueta) if etiqueta in pessoa.etiquetas else None
+    elif acao != 'adicionar':
+        return jsonify({"erro": "Ação inválida."}), 400
+    db.session.commit()
+    etiquetas = [{"id": item.id, "nome": item.nome} for item in pessoa.etiquetas]
+    return jsonify({"etiquetas": etiquetas})
+
+
+@bp.route('/api/conversas/<int:pessoa_id>/assistente-ia', methods=['POST'])
+@login_required
+def atualizar_assistente_conversa(pessoa_id):
+    dados = request.get_json(silent=True) or {}
+    ativa = dados.get('ativa')
+    if not isinstance(ativa, bool):
+        return jsonify({"erro": "Informe se o assistente deve ficar ativo."}), 400
+    pessoa = Pessoa.query.filter_by(id=pessoa_id, empresa_id=current_user.empresa_id).first()
+    if not pessoa:
+        return jsonify({"erro": "Conversa não encontrada."}), 404
+    pessoa.ia_ativa = ativa
+    db.session.commit()
+    return jsonify({"status": "sucesso", "ia_ativa": pessoa.ia_ativa})
 
 @bp.route('/api/send_message', methods=['POST'])
 @login_required
@@ -587,6 +700,9 @@ def webhook_whatsapp():
             db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
             db.session.commit()
 
+            if not pessoa.ia_ativa:
+                return jsonify({"status": "processado", "assistente_ia": "desativada"}), 200
+
             try:
                 requests.post(
                     f"{current_app.config['EVOLUTION_API_URL'].rstrip('/')}/chat/sendPresence/{nome_instancia}",
@@ -627,7 +743,8 @@ def webhook_whatsapp():
                     etapa_contato = Etapa.query.filter_by(empresa_id=empresa.id, nome='Contato Feito').first()
                     if negocio and primeira_etapa and etapa_contato and negocio.etapa_id == primeira_etapa.id:
                         negocio.etapa_id = etapa_contato.id
-                        db.session.commit()
+                    pessoa.ia_ativa = False
+                    db.session.commit()
             except Exception as e:
                 resposta_bot = "Olá! A nossa assistente virtual está temporariamente indisponível. Um consultor assumirá o atendimento."
 

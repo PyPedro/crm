@@ -36,7 +36,12 @@
                 <p class="text-sm text-slate-500 font-medium mt-0.5">Gestão de oportunidades Optmiza</p>
             </div>
             
-            <div class="flex items-center bg-white border border-slate-200 rounded-full py-1.5 px-4 shadow-sm">
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="abrirModalLead()" class="flex items-center gap-2 rounded-lg bg-[#16382e] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245642]">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m-7-7h14"/></svg>
+                    <span>Novo lead</span>
+                </button>
+                <div class="flex items-center bg-white border border-slate-200 rounded-full py-1.5 px-4 shadow-sm">
                 <div class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs mr-3">
                     {{ current_user.username[0]|upper }}
                 </div>
@@ -44,6 +49,7 @@
                 {% if current_user.is_admin %}
                 <span class="bg-slate-100 text-slate-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider">Admin</span>
                 {% endif %}
+                </div>
             </div>
         </header>
 
@@ -74,6 +80,13 @@
                                 <div class="pr-4">
                                     <h3 class="font-bold text-slate-800 text-sm leading-tight">{{ negocio.titulo }}</h3>
                                     <p class="text-xs text-slate-500 mt-1 font-medium">{{ negocio.pessoa.nome }}</p>
+                                    {% if negocio.pessoa.etiquetas %}
+                                    <div class="mt-2 flex flex-wrap gap-1">
+                                        {% for etiqueta in negocio.pessoa.etiquetas %}
+                                        <span class="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{{ etiqueta.nome }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 <div class="text-slate-300 group-hover:text-brand-500 transition-colors">
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
@@ -152,6 +165,40 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- MODAL DE CADASTRO DE LEAD -->
+    <div id="lead-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+        <form onsubmit="salvarLead(event)" class="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-7 shadow-2xl">
+            <button type="button" onclick="fecharModalLead()" aria-label="Fechar" class="absolute right-5 top-5 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-800">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <h2 class="mb-1 text-xl font-bold text-slate-800">Cadastrar lead</h2>
+            <p class="mb-6 text-sm text-slate-500">O contato e a oportunidade serão adicionados ao funil.</p>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label class="text-xs font-semibold text-slate-600">Nome
+                    <input id="lead-nome" required maxlength="100" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                </label>
+                <label class="text-xs font-semibold text-slate-600">Telefone / WhatsApp
+                    <input id="lead-telefone" required inputmode="tel" maxlength="24" placeholder="5511999999999" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                </label>
+                <label class="text-xs font-semibold text-slate-600 sm:col-span-2">Oportunidade
+                    <input id="lead-titulo" maxlength="100" placeholder="Ex.: Plano anual" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                </label>
+                <label class="text-xs font-semibold text-slate-600">Valor estimado
+                    <input id="lead-valor" type="number" min="0" step="0.01" value="0" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                </label>
+                <label class="text-xs font-semibold text-slate-600">Etapa
+                    <select id="lead-etapa" class="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                        {% for etapa in etapas %}<option value="{{ etapa.id }}">{{ etapa.nome }}</option>{% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="mt-7 flex justify-end gap-2">
+                <button type="button" onclick="fecharModalLead()" class="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">Cancelar</button>
+                <button id="salvar-lead-btn" type="submit" class="rounded-lg bg-[#16382e] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245642]">Cadastrar lead</button>
+            </div>
+        </form>
     </div>
 
     <!-- MODAL DE TREINAMENTO DA IA -->
@@ -260,6 +307,26 @@
             </button>
         </div>
 
+        <div class="border-b border-slate-100 bg-white px-5 py-3">
+            <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input type="checkbox" id="chat-ia-toggle" onchange="alternarAssistenteIA(this.checked)" class="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                Assistente de IA ativo nesta conversa
+            </label>
+            <div id="chat-etiquetas" class="mt-3 flex flex-wrap gap-1.5"></div>
+            <div class="mt-3 flex gap-2">
+                <select id="chat-etiqueta-select" aria-label="Selecionar etiqueta" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700">
+                    <option value="">Adicionar etiqueta...</option>
+                </select>
+                <button type="button" onclick="adicionarEtiquetaConversa()" title="Adicionar etiqueta selecionada" class="rounded-lg border border-slate-200 px-3 text-slate-600 transition hover:bg-slate-50" aria-label="Adicionar etiqueta selecionada">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m-7-7h14"/></svg>
+                </button>
+            </div>
+            <div class="mt-2 flex gap-2">
+                <input id="nova-etiqueta-chat" maxlength="40" placeholder="Criar nova etiqueta" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-emerald-700">
+                <button type="button" onclick="criarEtiquetaConversa()" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Criar</button>
+            </div>
+        </div>
+
         <div id="chat-messages" class="flex-1 p-6 overflow-y-auto bg-slate-50 flex flex-col space-y-4"></div>
 
         <div class="p-5 bg-white border-t border-slate-100 flex flex-col">
@@ -294,6 +361,48 @@
         let qrInterval = null;
         let arquivoSelecionado = null;
         const nomeOperadorAtual = "{{ current_user.username }}";
+
+        function abrirModalLead() {
+            const modal = document.getElementById('lead-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('lead-nome').focus();
+        }
+
+        function fecharModalLead() {
+            const modal = document.getElementById('lead-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function salvarLead(event) {
+            event.preventDefault();
+            const botao = document.getElementById('salvar-lead-btn');
+            botao.disabled = true;
+            botao.innerText = 'Salvando...';
+            try {
+                const res = await fetch('/api/leads', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nome: document.getElementById('lead-nome').value,
+                        telefone: document.getElementById('lead-telefone').value,
+                        titulo: document.getElementById('lead-titulo').value,
+                        valor: document.getElementById('lead-valor').value,
+                        etapa_id: document.getElementById('lead-etapa').value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.erro || 'Não foi possível cadastrar o lead.');
+                fecharModalLead();
+                window.location.reload();
+            } catch (erro) {
+                mostrarNotificacao('Erro ao cadastrar lead', erro.message);
+            } finally {
+                botao.disabled = false;
+                botao.innerText = 'Cadastrar lead';
+            }
+        }
 
         // ==========================================
         // 1. KANBAN (DRAG AND DROP) & ATRIBUIÇÃO
@@ -361,6 +470,10 @@
             try {
                 const response = await fetch(`/api/get_chat/${pessoaId}`); 
                 const data = await response.json();
+                if (!response.ok) throw new Error(data.erro || 'Não foi possível carregar a conversa.');
+                document.getElementById('chat-ia-toggle').checked = data.ia_ativa;
+                renderizarEtiquetasChat(data.etiquetas);
+                await carregarEtiquetasDisponiveis();
                 const container = document.getElementById('chat-messages'); 
                 container.innerHTML = ''; 
                 
@@ -385,6 +498,100 @@
                 });
                 container.scrollTop = container.scrollHeight;
             } catch (err) {}
+        }
+
+        function renderizarEtiquetasChat(etiquetas) {
+            const container = document.getElementById('chat-etiquetas');
+            container.replaceChildren();
+            etiquetas.forEach(etiqueta => {
+                const chip = document.createElement('span');
+                chip.className = 'inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-900';
+                const nome = document.createElement('span');
+                nome.textContent = etiqueta.nome;
+                const remover = document.createElement('button');
+                remover.type = 'button';
+                remover.className = 'ml-1 text-emerald-700 hover:text-red-600';
+                remover.title = `Remover etiqueta ${etiqueta.nome}`;
+                remover.setAttribute('aria-label', `Remover etiqueta ${etiqueta.nome}`);
+                remover.textContent = '×';
+                remover.onclick = () => alterarEtiquetaConversa(etiqueta.id, 'remover');
+                chip.append(nome, remover);
+                container.appendChild(chip);
+            });
+            if (!etiquetas.length) {
+                const vazio = document.createElement('span');
+                vazio.className = 'text-[11px] text-slate-400';
+                vazio.textContent = 'Sem etiquetas';
+                container.appendChild(vazio);
+            }
+        }
+
+        async function carregarEtiquetasDisponiveis() {
+            const select = document.getElementById('chat-etiqueta-select');
+            const res = await fetch('/api/etiquetas');
+            const etiquetas = await res.json();
+            select.replaceChildren(new Option('Adicionar etiqueta...', ''));
+            etiquetas.forEach(etiqueta => select.add(new Option(etiqueta.nome, etiqueta.id)));
+        }
+
+        async function alterarEtiquetaConversa(etiquetaId, acao = 'adicionar') {
+            if (!pessoaAtualId) return;
+            try {
+                const res = await fetch(`/api/conversas/${pessoaAtualId}/etiquetas`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ etiqueta_id: etiquetaId, acao }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.erro || 'Não foi possível atualizar as etiquetas.');
+                renderizarEtiquetasChat(data.etiquetas);
+                recarregarKanbanInvisivel();
+            } catch (erro) {
+                mostrarNotificacao('Erro nas etiquetas', erro.message);
+            }
+        }
+
+        function adicionarEtiquetaConversa() {
+            const id = document.getElementById('chat-etiqueta-select').value;
+            if (id) alterarEtiquetaConversa(Number(id));
+        }
+
+        async function criarEtiquetaConversa() {
+            const input = document.getElementById('nova-etiqueta-chat');
+            const nome = input.value.trim();
+            if (!nome || !pessoaAtualId) return;
+            try {
+                const res = await fetch('/api/etiquetas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome }),
+                });
+                const etiqueta = await res.json();
+                if (!res.ok) throw new Error(etiqueta.erro || 'Não foi possível criar a etiqueta.');
+                await carregarEtiquetasDisponiveis();
+                document.getElementById('chat-etiqueta-select').value = etiqueta.id;
+                input.value = '';
+                await alterarEtiquetaConversa(etiqueta.id);
+            } catch (erro) {
+                mostrarNotificacao('Erro nas etiquetas', erro.message);
+            }
+        }
+
+        async function alternarAssistenteIA(ativa) {
+            if (!pessoaAtualId) return;
+            try {
+                const res = await fetch(`/api/conversas/${pessoaAtualId}/assistente-ia`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ativa }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.erro || 'Não foi possível atualizar o assistente.');
+                mostrarNotificacao('Assistente de IA', ativa ? 'Ativado nesta conversa.' : 'Desativado nesta conversa.');
+            } catch (erro) {
+                document.getElementById('chat-ia-toggle').checked = !ativa;
+                mostrarNotificacao('Erro no assistente', erro.message);
+            }
         }
 
         function prepararArquivo(event) {

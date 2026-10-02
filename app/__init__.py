@@ -3,6 +3,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from authlib.integrations.flask_client import OAuth
+from sqlalchemy import inspect, text
 from dotenv import load_dotenv, find_dotenv
 
 # Carrega as variáveis do ficheiro .env
@@ -52,6 +53,12 @@ def create_app(config_overrides=None):
 
     with app.app_context():
         db.create_all()
+        columns = {column['name'] for column in inspect(db.engine).get_columns('pessoa')}
+        if 'ia_ativa' not in columns:
+            with db.engine.begin() as connection:
+                connection.execute(text(
+                    'ALTER TABLE pessoa ADD COLUMN ia_ativa BOOLEAN NOT NULL DEFAULT TRUE'
+                ))
 
     return app
 

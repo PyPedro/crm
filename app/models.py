@@ -4,6 +4,13 @@ from datetime import datetime
 from sqlalchemy import UniqueConstraint
 
 
+pessoa_etiqueta = db.Table(
+    'pessoa_etiqueta',
+    db.Column('pessoa_id', db.Integer, db.ForeignKey('pessoa.id'), primary_key=True),
+    db.Column('etiqueta_id', db.Integer, db.ForeignKey('etiqueta.id'), primary_key=True),
+)
+
+
 class Empresa(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
@@ -34,13 +41,24 @@ class Pessoa(db.Model):
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False, index=True)
     nome = db.Column(db.String(100))
     telefone = db.Column(db.String(20))
+    ia_ativa = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
     negocios = db.relationship('Negocio', backref='pessoa', lazy=True)
+    etiquetas = db.relationship('Etiqueta', secondary=pessoa_etiqueta, back_populates='pessoas', lazy='selectin')
     __table_args__ = (UniqueConstraint('empresa_id', 'telefone', name='uq_pessoa_empresa_telefone'),)
 
     @property
     def qtd_nao_lidas(self):
         return Mensagem.query.filter_by(empresa_id=self.empresa_id, pessoa_id=self.id, tipo='inbound', lida=False).count()
+
+
+class Etiqueta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False, index=True)
+    nome = db.Column(db.String(40), nullable=False)
+    pessoas = db.relationship('Pessoa', secondary=pessoa_etiqueta, back_populates='etiquetas', lazy=True)
+    __table_args__ = (UniqueConstraint('empresa_id', 'nome', name='uq_etiqueta_empresa_nome'),)
+
 
 class Etapa(db.Model):
     id = db.Column(db.Integer, primary_key=True)
