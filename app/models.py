@@ -17,6 +17,8 @@ class Empresa(db.Model):
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     is_ativa = db.Column(db.Boolean, default=True, nullable=False)
+    usar_menu_inicial = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    mensagem_saudacao = db.Column(db.Text, nullable=False, default='Olá! Como podemos ajudar hoje?', server_default='Olá! Como podemos ajudar hoje?')
 
     users = db.relationship('User', backref='empresa', cascade='all, delete-orphan', lazy=True)
     etapas = db.relationship('Etapa', backref='empresa', cascade='all, delete-orphan', lazy=True)
@@ -24,6 +26,7 @@ class Empresa(db.Model):
     pessoas = db.relationship('Pessoa', backref='empresa', cascade='all, delete-orphan', lazy=True)
     mensagens = db.relationship('Mensagem', backref='empresa', cascade='all, delete-orphan', lazy=True)
     configuracoes = db.relationship('Configuracao', backref='empresa', cascade='all, delete-orphan', lazy=True)
+    menu_opcoes = db.relationship('MenuOpcao', backref='empresa', cascade='all, delete-orphan', lazy=True)
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,6 +45,7 @@ class Pessoa(db.Model):
     nome = db.Column(db.String(100))
     telefone = db.Column(db.String(20))
     ia_ativa = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    status_atendimento = db.Column(db.String(20), nullable=False, default='ia', server_default='ia')
     mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
     negocios = db.relationship('Negocio', backref='pessoa', lazy=True)
     etiquetas = db.relationship('Etiqueta', secondary=pessoa_etiqueta, back_populates='pessoas', lazy='selectin')
@@ -50,6 +54,15 @@ class Pessoa(db.Model):
     @property
     def qtd_nao_lidas(self):
         return Mensagem.query.filter_by(empresa_id=self.empresa_id, pessoa_id=self.id, tipo='inbound', lida=False).count()
+
+
+class MenuOpcao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False, index=True)
+    numero = db.Column(db.Integer, nullable=False)
+    descricao = db.Column(db.String(120), nullable=False)
+    acao_destino = db.Column(db.String(20), nullable=False)
+    __table_args__ = (UniqueConstraint('empresa_id', 'numero', name='uq_menu_opcao_empresa_numero'),)
 
 
 class Etiqueta(db.Model):

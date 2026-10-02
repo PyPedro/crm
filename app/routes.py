@@ -9,11 +9,12 @@ from dotenv import load_dotenv, find_dotenv
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session
 from datetime import datetime
 from flask_login import login_user, logout_user, login_required, current_user
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 
 from app import oauth
-from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta
+from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta, MenuOpcao
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from google import genai
 from google.genai import types
@@ -402,6 +403,99 @@ def apagar_usuario(id):
     return jsonify({"erro": "Utilizador não encontrado"}), 404
 
 # --- CONFIGURAÇÕES E KANBAN ---
+@bp.route('/configuracoes/bot', methods=['GET', 'POST'])
+@login_required
+def configuracoes_bot():
+    if not current_user.is_admin:
+        return 'Acesso negado.', 403
+
+    empresa = db.session.get(Empresa, current_user.empresa_id)
+    opcoes = MenuOpcao.query.filter_by(empresa_id=empresa.id).order_by(MenuOpcao.numero).all()
+    erro = None
+    opcoes_form = [
+        {"numero": str(opcao.numero), "descricao": opcao.descricao, "acao_destino": opcao.acao_destino}
+        for opcao in opcoes
+    ]
+
+    if request.method == 'POST':
+        mensagem_saudacao = (request.form.get('mensagem_saudacao') or '').strip()
+        usar_menu = request.form.get('usar_menu_inicial') == 'on'
+        numeros = request.form.getlist('opcao_numero')
+        descricoes = request.form.getlist('opcao_descricao')
+        destinos = request.form.getlist('opcao_destino')
+        opcoes_form = [
+            {"numero": numero.strip(), "descricao": descricao.strip(), "acao_destino": destino.strip()}
+            for numero, descricao, destino in zip(numeros, descricoes, destinos)
+        ]
+        novas_opcoes = []
+
+        if not mensagem_saudacao or len(mensagem_saudacao) > 2000:
+            erro = 'A saudação deve ter entre 1 e 2000 caracteres.'
+        elif len(numeros) != len(descricoes) or len(numeros) != len(destinos):
+            erro = 'As opções enviadas estão incompletas.'
+        elif len(numeros) > 9:
+            erro = 'O menu pode ter no máximo 9 opções.'
+        else:
+            numeros_usados = set()
+            for numero, descricao, destino in zip(numeros, descricoes, destinos):
+                numero = numero.strip()
+                descricao = descricao.strip()
+                destino = destino.strip()
+                if not numero and not descricao and not destino:
+                    continue
+                try:
+                    numero_int = int(numero)
+                except ValueError:
+                    erro = 'Cada opção precisa ter um número entre 1 e 9.'
+                    break
+                if numero_int < 1 or numero_int > 9 or numero_int in numeros_usados:
+                    erro = 'Os números devem ser únicos e ficar entre 1 e 9.'
+                    break
+                if not descricao or len(descricao) > 120:
+                    erro = 'A descrição deve ter entre 1 e 120 caracteres.'
+                    break
+                if destino not in {'ia', 'humano'}:
+                    erro = 'O destino deve ser IA ou atendente humano.'
+                    break
+                numeros_usados.add(numero_int)
+                novas_opcoes.append(MenuOpcao(
+                    empresa_id=empresa.id,
+                    numero=numero_int,
+                    descricao=descricao,
+                    acao_destino=destino,
+                ))
+
+            if not erro and usar_menu and not novas_opcoes:
+                erro = 'Adicione ao menos uma opção antes de ativar o menu.'
+
+        if erro:
+            return render_template(
+                'configuracoes.html', empresa=empresa, opcoes=opcoes_form, erro=erro,
+                form_ativar=usar_menu, mensagem_form=mensagem_saudacao,
+            ), 400
+
+        empresa.usar_menu_inicial = usar_menu
+        empresa.mensagem_saudacao = mensagem_saudacao
+        MenuOpcao.query.filter_by(empresa_id=empresa.id).delete(synchronize_session=False)
+        db.session.add_all(novas_opcoes)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            current_app.logger.exception('Falha ao salvar as opções do menu da empresa %s', empresa.id)
+            return render_template(
+                'configuracoes.html', empresa=empresa, opcoes=opcoes_form,
+                erro='Não foi possível salvar as opções. Revise os números e tente novamente.',
+                form_ativar=usar_menu, mensagem_form=mensagem_saudacao,
+            ), 409
+        return redirect(url_for('main.configuracoes_bot', salvo=1))
+
+    return render_template(
+        'configuracoes.html', empresa=empresa, opcoes=opcoes_form,
+        salvo=request.args.get('salvo') == '1',
+    )
+
+
 @bp.route('/api/configuracoes', methods=['GET', 'POST'])
 @login_required
 def configuracoes():
@@ -499,7 +593,12 @@ def criar_lead():
 
     pessoa = Pessoa.query.filter_by(empresa_id=current_user.empresa_id, telefone=telefone).first()
     if not pessoa:
-        pessoa = Pessoa(empresa_id=current_user.empresa_id, nome=nome, telefone=telefone)
+        pessoa = Pessoa(
+            empresa_id=current_user.empresa_id,
+            nome=nome,
+            telefone=telefone,
+            status_atendimento='menu' if current_user.empresa.usar_menu_inicial else 'ia',
+        )
         db.session.add(pessoa)
         db.session.flush()
 
@@ -592,6 +691,7 @@ def atualizar_assistente_conversa(pessoa_id):
     if not pessoa:
         return jsonify({"erro": "Conversa não encontrada."}), 404
     pessoa.ia_ativa = ativa
+    pessoa.status_atendimento = 'ia' if ativa else 'humano'
     db.session.commit()
     return jsonify({"status": "sucesso", "ia_ativa": pessoa.ia_ativa})
 
@@ -638,6 +738,25 @@ def update_deal_stage():
     return jsonify({"erro": "Não encontrado"}), 404
 
 # --- WEBHOOK WHATSAPP (SEM LOGIN, INTERAGE COM IA) ---
+def montar_texto_menu(empresa):
+    opcoes = MenuOpcao.query.filter_by(empresa_id=empresa.id).order_by(MenuOpcao.numero).all()
+    linhas = [f'{opcao.numero} - {opcao.descricao}' for opcao in opcoes]
+    saudacao = empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?'
+    return f'{saudacao}\n\n' + '\n'.join(linhas) if linhas else saudacao
+
+
+def enviar_resposta_webhook(empresa_id, pessoa_id, telefone, instancia, texto):
+    if enviar_mensagem_whatsapp(telefone, texto, instancia):
+        db.session.add(Mensagem(
+            empresa_id=empresa_id,
+            pessoa_id=pessoa_id,
+            mensagem=texto,
+            tipo='outbound',
+            data_envio=datetime.now(),
+        ))
+        db.session.commit()
+
+
 @bp.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
     dados = request.json
@@ -675,8 +794,17 @@ def webhook_whatsapp():
 
         if telefone_remetente and (texto_recebido or is_media):
             pessoa = Pessoa.query.filter_by(empresa_id=empresa.id, telefone=telefone_remetente).first()
+            primeira_mensagem = pessoa is None or not Mensagem.query.filter_by(
+                empresa_id=empresa.id, pessoa_id=pessoa.id, tipo='inbound'
+            ).first()
             if not pessoa:
-                pessoa = Pessoa(empresa_id=empresa.id, nome=nome_contato, telefone=telefone_remetente)
+                pessoa = Pessoa(
+                    empresa_id=empresa.id,
+                    nome=nome_contato,
+                    telefone=telefone_remetente,
+                    status_atendimento='menu' if empresa.usar_menu_inicial else 'ia',
+                    ia_ativa=True,
+                )
                 db.session.add(pessoa)
                 db.session.commit()
                 primeira_etapa = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).first()
@@ -684,6 +812,9 @@ def webhook_whatsapp():
                     return jsonify({"erro": "A empresa não possui etapas configuradas"}), 500
                 db.session.add(Negocio(empresa_id=empresa.id, titulo=f"Op. - {telefone_remetente}", pessoa_id=pessoa.id, etapa_id=primeira_etapa.id, user_id=None))
                 db.session.commit()
+            elif primeira_mensagem and empresa.usar_menu_inicial:
+                pessoa.status_atendimento = 'menu'
+                pessoa.ia_ativa = True
 
             msg_db = texto_recebido
             if is_media:
@@ -700,8 +831,47 @@ def webhook_whatsapp():
             db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
             db.session.commit()
 
-            if not pessoa.ia_ativa:
-                return jsonify({"status": "processado", "assistente_ia": "desativada"}), 200
+            if primeira_mensagem and empresa.usar_menu_inicial:
+                enviar_resposta_webhook(
+                    empresa.id, pessoa.id, telefone_remetente, nome_instancia,
+                    montar_texto_menu(empresa),
+                )
+                return jsonify({"status": "processado", "atendimento": "menu"}), 200
+
+            if pessoa.status_atendimento == 'menu':
+                if not empresa.usar_menu_inicial:
+                    pessoa.status_atendimento = 'ia'
+                    pessoa.ia_ativa = True
+                    db.session.commit()
+                else:
+                    texto_opcao = (texto_recebido or '').strip()
+                    opcao = None
+                    if texto_opcao.isdigit():
+                        opcao = MenuOpcao.query.filter_by(
+                            empresa_id=empresa.id, numero=int(texto_opcao)
+                        ).first()
+                    if opcao:
+                        pessoa.status_atendimento = opcao.acao_destino
+                        pessoa.ia_ativa = opcao.acao_destino == 'ia'
+                        db.session.commit()
+                        confirmacao = (
+                            'Pode fazer a sua pergunta para a nossa IA!'
+                            if opcao.acao_destino == 'ia'
+                            else 'Transferindo para um atendente...'
+                        )
+                        enviar_resposta_webhook(
+                            empresa.id, pessoa.id, telefone_remetente,
+                            nome_instancia, confirmacao,
+                        )
+                    else:
+                        enviar_resposta_webhook(
+                            empresa.id, pessoa.id, telefone_remetente,
+                            nome_instancia, montar_texto_menu(empresa),
+                        )
+                    return jsonify({"status": "processado", "atendimento": "menu"}), 200
+
+            if pessoa.status_atendimento == 'humano' or not pessoa.ia_ativa:
+                return jsonify({"status": "processado", "atendimento": "humano"}), 200
 
             try:
                 requests.post(
@@ -743,15 +913,17 @@ def webhook_whatsapp():
                     etapa_contato = Etapa.query.filter_by(empresa_id=empresa.id, nome='Contato Feito').first()
                     if negocio and primeira_etapa and etapa_contato and negocio.etapa_id == primeira_etapa.id:
                         negocio.etapa_id = etapa_contato.id
+                    pessoa.status_atendimento = 'humano'
                     pessoa.ia_ativa = False
                     db.session.commit()
             except Exception as e:
                 resposta_bot = "Olá! A nossa assistente virtual está temporariamente indisponível. Um consultor assumirá o atendimento."
 
             if resposta_bot:
-                enviar_mensagem_whatsapp(telefone_remetente, resposta_bot, nome_instancia)
-                db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=resposta_bot, tipo='outbound', data_envio=datetime.now()))
-                db.session.commit()
+                enviar_resposta_webhook(
+                    empresa.id, pessoa.id, telefone_remetente,
+                    nome_instancia, resposta_bot,
+                )
 
     except Exception as e: print(f"Erro Webhook: {e}")
     return jsonify({"status": "processado"}), 200

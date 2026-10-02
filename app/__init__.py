@@ -53,12 +53,32 @@ def create_app(config_overrides=None):
 
     with app.app_context():
         db.create_all()
-        columns = {column['name'] for column in inspect(db.engine).get_columns('pessoa')}
-        if 'ia_ativa' not in columns:
+        migrations = {
+            'empresa': {
+                'usar_menu_inicial': 'BOOLEAN NOT NULL DEFAULT FALSE',
+                'mensagem_saudacao': "TEXT NOT NULL DEFAULT 'Olá! Como podemos ajudar hoje?'",
+            },
+            'pessoa': {
+                'ia_ativa': 'BOOLEAN NOT NULL DEFAULT TRUE',
+                'status_atendimento': "VARCHAR(20) NOT NULL DEFAULT 'ia'",
+            },
+        }
+        existing_columns = {
+            table: {column['name'] for column in inspect(db.engine).get_columns(table)}
+            for table in migrations
+        }
+        pending_migrations = [
+            (table, column, definition)
+            for table, definitions in migrations.items()
+            for column, definition in definitions.items()
+            if column not in existing_columns[table]
+        ]
+        if pending_migrations:
             with db.engine.begin() as connection:
-                connection.execute(text(
-                    'ALTER TABLE pessoa ADD COLUMN ia_ativa BOOLEAN NOT NULL DEFAULT TRUE'
-                ))
+                for table, column, definition in pending_migrations:
+                    connection.execute(text(
+                        f'ALTER TABLE "{table}" ADD COLUMN "{column}" {definition}'
+                    ))
 
     return app
 
