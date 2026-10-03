@@ -4,12 +4,21 @@ from datetime import datetime
 
 import requests
 from flask import current_app
+from celery.signals import worker_process_init
 from google.genai import types
 
 from app import celery, db
 from app.models import Configuracao, Empresa, Etapa, Mensagem, Negocio, Pessoa
 from app.services.ia_service import gerar_resposta_ia
 from app.services.whatsapp import enviar_mensagem_whatsapp
+
+
+@worker_process_init.connect
+def init_celery_db_connection(**kwargs):
+    flask_app = celery.flask_app
+    with flask_app.app_context():
+        db.session.remove()
+        db.engine.dispose(close=False)
 
 
 def _personalizar_mensagem(texto, empresa, pessoa):

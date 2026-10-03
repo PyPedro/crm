@@ -42,6 +42,9 @@ def create_app(config_overrides=None):
     app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
     app.config['GOOGLE_REDIRECT_URI'] = os.environ.get('GOOGLE_REDIRECT_URI')
     app.config.update(config_overrides or {})
+    engine_options = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS') or {})
+    engine_options.update(pool_pre_ping=True, pool_recycle=300)
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_options
     redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
     app.config.setdefault('CELERY_BROKER_URL', os.environ.get('CELERY_BROKER_URL', redis_url))
     app.config.setdefault('CELERY_RESULT_BACKEND', os.environ.get('CELERY_RESULT_BACKEND', redis_url))
