@@ -118,6 +118,14 @@ def create_app(config_overrides=None):
                     ))
 
         if db.engine.dialect.name == 'postgresql':
+            with db.engine.begin() as connection:
+                connection.execute(text(
+                    'ALTER TABLE "empresa" ALTER COLUMN "is_ativa" SET DEFAULT FALSE'
+                ))
+                connection.execute(text(
+                    'ALTER TABLE "user" ALTER COLUMN "is_super_admin" SET DEFAULT FALSE'
+                ))
+
             timestamp_columns = {
                 'empresa': ('data_criacao',),
                 'mensagem': ('data_envio',),

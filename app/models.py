@@ -24,7 +24,7 @@ class Empresa(db.Model):
     nome = db.Column(db.String(120), nullable=False)
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     data_criacao = db.Column(db.DateTime, nullable=False, default=hora_atual_br)
-    is_ativa = db.Column(db.Boolean, default=True, nullable=False)
+    is_ativa = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     usar_menu_inicial = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     mensagem_saudacao = db.Column(db.Text, nullable=False, default='Olá! Como podemos ajudar hoje?', server_default='Olá! Como podemos ajudar hoje?')
     prompt_personalidade = db.Column(db.Text, nullable=False, default='Responda de forma curta, direta e amigável.', server_default='Responda de forma curta, direta e amigável.')
@@ -47,7 +47,7 @@ class User(UserMixin, db.Model):
     google_id = db.Column(db.String(255), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
-    is_super_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_super_admin = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     negocios = db.relationship('Negocio', backref='atendente', lazy=True)
 
 class Pessoa(db.Model):

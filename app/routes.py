@@ -5,7 +5,7 @@ import secrets
 import unicodedata
 import math
 from dotenv import load_dotenv, find_dotenv
-from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session
+from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -38,7 +38,8 @@ def bloquear_empresa_suspensa():
         return None
 
     if current_user.is_super_admin and request.endpoint in {
-        'main.optmiza_master', 'main.toggle_empresa'
+        'main.optmiza_master', 'main.toggle_empresa',
+        'main.admin_empresas_pendentes', 'main.admin_ativar_empresa',
     }:
         return None
 
@@ -154,7 +155,9 @@ def register():
     except requests.RequestException:
         return render_template('register.html', erro="Não foi possível configurar o WhatsApp. Tente novamente."), 502
 
-    empresa = Empresa(nome=nome_empresa, instancia_whatsapp=instancia)
+    empresa = Empresa(
+        nome=nome_empresa, instancia_whatsapp=instancia, is_ativa=False
+    )
     db.session.add(empresa)
     db.session.flush()
     db.session.add(User(
@@ -169,7 +172,11 @@ def register():
     ])
     db.session.add(Configuracao(empresa_id=empresa.id))
     db.session.commit()
-    return redirect(url_for('main.login', msg="Empresa criada. Entre para continuar a configuração do WhatsApp."))
+    flash(
+        'Cadastro realizado! A sua conta passará por uma análise e será ativada em breve pela nossa equipa.',
+        'success',
+    )
+    return redirect(url_for('main.login'))
 
 
 @bp.route('/login', methods=['GET', 'POST'])
@@ -182,7 +189,8 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
             if not user.empresa.is_ativa:
-                return render_template('login.html', erro='Conta suspensa. Contacte o suporte.'), 403
+                flash('Conta pendente de aprovação do administrador', 'warning')
+                return redirect(url_for('main.login'))
             login_user(user)
             return redirect(url_for('main.index'))
         return render_template('login.html', erro="Credenciais inválidas")
@@ -219,7 +227,8 @@ def authorize_google():
         if user.google_id and user.google_id != google_id:
             return redirect(url_for('main.login', msg='Este e-mail está associado a outra conta Google.'))
         if not user.empresa.is_ativa:
-            return redirect(url_for('main.login', msg='Conta suspensa. Contacte o suporte.'))
+            flash('Conta pendente de aprovação do administrador', 'warning')
+            return redirect(url_for('main.login'))
         if not user.google_id:
             user.google_id = google_id
             db.session.commit()
@@ -231,7 +240,11 @@ def authorize_google():
     except (RuntimeError, requests.RequestException):
         return redirect(url_for('main.login', msg='Não foi possível preparar o WhatsApp para a nova empresa. Tente novamente.'))
 
-    empresa = Empresa(nome=f'Empresa de {nome}'[:120], instancia_whatsapp=instancia)
+    empresa = Empresa(
+        nome=f'Empresa de {nome}'[:120],
+        instancia_whatsapp=instancia,
+        is_ativa=False,
+    )
     db.session.add(empresa)
     db.session.flush()
     username_base = re.sub(r'[^a-zA-Z0-9_.-]+', '', email.split('@')[0])[:40] or 'google'
@@ -251,8 +264,11 @@ def authorize_google():
     ])
     db.session.add(Configuracao(empresa_id=empresa.id))
     db.session.commit()
-    login_user(novo_user)
-    return redirect(url_for('main.index'))
+    flash(
+        'Cadastro realizado! A sua conta passará por uma análise e será ativada em breve pela nossa equipa.',
+        'success',
+    )
+    return redirect(url_for('main.login'))
 
 @bp.route('/logout')
 @login_required
@@ -298,6 +314,42 @@ def toggle_empresa(id):
     empresa.is_ativa = not empresa.is_ativa
     db.session.commit()
     return redirect(url_for('main.optmiza_master'))
+
+
+@bp.route('/admin/empresas/pendentes', methods=['GET'])
+@login_required
+def admin_empresas_pendentes():
+    if not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
+
+    csrf_token = session.setdefault(
+        'admin_empresas_csrf_token', secrets.token_urlsafe(32)
+    )
+    empresas = Empresa.query.filter_by(is_ativa=False).order_by(Empresa.id).all()
+    return render_template(
+        'painel_admin.html', empresas=empresas, csrf_token=csrf_token
+    )
+
+
+@bp.route('/admin/empresas/<int:id>/ativar', methods=['POST'])
+@login_required
+def admin_ativar_empresa(id):
+    if not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
+
+    token_enviado = request.form.get('csrf_token', '')
+    token_sessao = session.get('admin_empresas_csrf_token', '')
+    if not token_sessao or not secrets.compare_digest(token_enviado, token_sessao):
+        return 'Requisição inválida.', 400
+
+    empresa = db.session.get(Empresa, id)
+    if not empresa:
+        return 'Empresa não encontrada.', 404
+
+    empresa.is_ativa = True
+    db.session.commit()
+    flash(f'Empresa "{empresa.nome}" ativada com sucesso.', 'success')
+    return redirect(url_for('main.admin_empresas_pendentes'))
 
 # --- ROTAS DE SEGURANÇA: CONVITES E RESET DE SENHA ---
 @bp.route('/api/invite', methods=['POST'])
