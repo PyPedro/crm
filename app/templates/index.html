@@ -357,7 +357,9 @@
     <script>
         let pessoaAtualId = null;
         let telefoneAtual = null;
-        let ultimoIdMensagem = null;
+        let ultimoIdMensagem = 0;
+        let ultimaMensagemGlobalId = null;
+        let consultandoMensagensNovas = false;
         let qrInterval = null;
         let arquivoSelecionado = null;
         const nomeOperadorAtual = "{{ current_user.username }}";
@@ -452,6 +454,7 @@
         async function abrirChat(pessoaId, nome, telefone) {
             pessoaAtualId = pessoaId; 
             telefoneAtual = telefone;
+            ultimoIdMensagem = 0;
             const badge = document.getElementById('badge-' + pessoaId); 
             if (badge) badge.style.display = 'none';
             document.getElementById('chat-nome').innerText = nome; 
@@ -464,6 +467,7 @@
         function fecharChat() { 
             document.getElementById('chat-sidebar').classList.add('translate-x-full'); 
             pessoaAtualId = null; 
+            ultimoIdMensagem = 0;
         }
 
         async function carregarMensagens(pessoaId) {
@@ -471,33 +475,116 @@
                 const response = await fetch(`/api/get_chat/${pessoaId}`); 
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.erro || 'Não foi possível carregar a conversa.');
+                if (pessoaAtualId !== pessoaId) return;
                 document.getElementById('chat-ia-toggle').checked = data.ia_ativa;
                 renderizarEtiquetasChat(data.etiquetas);
                 await carregarEtiquetasDisponiveis();
                 const container = document.getElementById('chat-messages'); 
-                container.innerHTML = ''; 
-                
+                container.replaceChildren();
+                ultimoIdMensagem = 0;
                 data.mensagens.forEach(msg => {
-                    const isInbound = msg.direcao === 'inbound';
-                    const div = document.createElement('div');
-                    div.className = `max-w-[85%] rounded-2xl p-4 text-sm relative shadow-sm ${isInbound ? 'bg-white border border-slate-100 text-slate-800 self-start rounded-tl-sm' : 'bg-brand-600 text-white self-end rounded-tr-sm'}`;
-                    
-                    let texto = ''; let midiaHtml = '';
-                    try {
-                        const obj = JSON.parse(msg.conteudo);
-                        if (obj.type === 'image') { midiaHtml = `<img src="${obj.content}" class="w-full rounded-xl mt-1 mb-3 cursor-pointer hover:opacity-90" onclick="window.open('${obj.content}')">`; } 
-                        else if (obj.type === 'audio') { midiaHtml = `<audio controls class="w-full mt-1 mb-2 h-10"><source src="${obj.content}"></audio>`; } 
-                        else if (obj.type === 'document' || obj.type === 'file') { midiaHtml = `<a href="${obj.content}" download class="flex items-center font-semibold text-xs bg-black/10 p-2.5 rounded-xl mt-1 mb-3 hover:bg-black/20 transition-colors">📄 Baixar Documento</a>`; }
-                        texto = obj.caption || '';
-                    } catch(e) { texto = msg.conteudo; }
-
-                    let textoFormatado = texto.replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>');
-                    const timeColor = isInbound ? 'text-slate-400' : 'text-brand-200';
-                    div.innerHTML = `${midiaHtml}<div class="mb-3 leading-relaxed font-medium">${textoFormatado}</div><span class="text-[10px] ${timeColor} absolute bottom-1.5 right-3 font-bold">${msg.hora}</span>`;
-                    container.appendChild(div);
+                    container.appendChild(criarElementoMensagem(msg));
+                    ultimoIdMensagem = Math.max(ultimoIdMensagem, msg.id || 0);
                 });
                 container.scrollTop = container.scrollHeight;
             } catch (err) {}
+        }
+
+        function escaparTextoChat(texto) {
+            return String(texto || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/\n/g, '<br>')
+                .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+                .replace(/_(.*?)_/g, '<em>$1</em>');
+        }
+
+        function criarElementoMensagem(msg) {
+            const isInbound = msg.direcao === 'inbound';
+            const div = document.createElement('div');
+            div.dataset.messageId = msg.id || '';
+            div.className = `max-w-[85%] rounded-2xl p-4 text-sm relative shadow-sm ${isInbound ? 'bg-white border border-slate-100 text-slate-800 self-start rounded-tl-sm' : 'bg-brand-600 text-white self-end rounded-tr-sm'}`;
+
+            let texto = String(msg.conteudo || '');
+            let media = null;
+            try {
+                const objeto = JSON.parse(texto);
+                if (objeto && objeto.type) {
+                    media = objeto;
+                    texto = objeto.caption || '';
+                }
+            } catch (erro) {}
+
+            if (media && media.content) {
+                const urlSegura = /^(data:[a-z0-9.+-]+\/[a-z0-9.+-]+;base64,|https?:\/\/)/i.test(media.content);
+                if (urlSegura && media.type === 'image') {
+                    const imagem = document.createElement('img');
+                    imagem.src = media.content;
+                    imagem.alt = 'Imagem recebida';
+                    imagem.className = 'w-full rounded-xl mt-1 mb-3 cursor-pointer hover:opacity-90';
+                    imagem.addEventListener('click', () => window.open(media.content, '_blank', 'noopener,noreferrer'));
+                    div.appendChild(imagem);
+                } else if (urlSegura && media.type === 'audio') {
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.className = 'w-full mt-1 mb-2 h-10';
+                    const source = document.createElement('source');
+                    source.src = media.content;
+                    audio.appendChild(source);
+                    div.appendChild(audio);
+                } else if (urlSegura && ['document', 'file'].includes(media.type)) {
+                    const link = document.createElement('a');
+                    link.href = media.content;
+                    link.download = '';
+                    link.rel = 'noopener noreferrer';
+                    link.className = 'flex items-center font-semibold text-xs bg-black/10 p-2.5 rounded-xl mt-1 mb-3 hover:bg-black/20 transition-colors';
+                    link.textContent = 'Baixar documento';
+                    div.appendChild(link);
+                }
+            }
+
+            if (texto) {
+                const corpo = document.createElement('div');
+                corpo.className = 'mb-3 leading-relaxed font-medium';
+                corpo.innerHTML = escaparTextoChat(texto);
+                div.appendChild(corpo);
+            }
+            const hora = document.createElement('span');
+            hora.className = `text-[10px] ${isInbound ? 'text-slate-400' : 'text-brand-200'} absolute bottom-1.5 right-3 font-bold`;
+            hora.textContent = msg.hora || '';
+            div.appendChild(hora);
+            return div;
+        }
+
+        async function consultarMensagensNovas() {
+            const pessoaId = pessoaAtualId;
+            if (pessoaId === null || consultandoMensagensNovas) return;
+            consultandoMensagensNovas = true;
+            try {
+                const url = `/api/mensagens/novas/${ultimoIdMensagem}?pessoa_id=${encodeURIComponent(pessoaId)}`;
+                const response = await fetch(url, { cache: 'no-store' });
+                if (!response.ok) return;
+                const mensagens = await response.json();
+                if (pessoaAtualId !== pessoaId) return;
+                const container = document.getElementById('chat-messages');
+                let adicionouMensagem = false;
+                mensagens.forEach(msg => {
+                    if (msg.id <= ultimoIdMensagem) return;
+                    container.appendChild(criarElementoMensagem(msg));
+                    ultimoIdMensagem = msg.id;
+                    adicionouMensagem = true;
+                });
+                if (adicionouMensagem) {
+                    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                }
+            } catch (erro) {
+                console.error('Falha ao buscar novas mensagens:', erro);
+            } finally {
+                consultandoMensagensNovas = false;
+            }
         }
 
         function renderizarEtiquetasChat(etiquetas) {
@@ -625,8 +712,9 @@
             if (arquivoSelecionado) { payload.media = arquivoSelecionado.base64; payload.fileName = arquivoSelecionado.name; }
             
             input.value = ''; removerAnexo();
-            await fetch('/api/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            carregarMensagens(pessoaAtualId);
+            const pessoaId = pessoaAtualId;
+            const response = await fetch('/api/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (response.ok && pessoaAtualId === pessoaId) await consultarMensagensNovas();
         }
 
         // ==========================================
@@ -636,15 +724,16 @@
             try {
                 const res = await fetch('/api/check_updates?t=' + new Date().getTime()); 
                 const dados = await res.json();
-                if (ultimoIdMensagem === null) { ultimoIdMensagem = dados.ultima_mensagem_id; return; }
-                if (dados.ultima_mensagem_id > ultimoIdMensagem) {
-                    ultimoIdMensagem = dados.ultima_mensagem_id;
+                if (ultimaMensagemGlobalId === null) { ultimaMensagemGlobalId = dados.ultima_mensagem_id; return; }
+                if (dados.ultima_mensagem_id > ultimaMensagemGlobalId) {
+                    ultimaMensagemGlobalId = dados.ultima_mensagem_id;
                     if (dados.tipo === 'inbound') { mostrarNotificacao(dados.remetente, dados.texto); }
                     recarregarKanbanInvisivel();
-                    if (pessoaAtualId !== null) { carregarMensagens(pessoaAtualId); }
                 }
             } catch (erro) {}
         }, 3000);
+
+        setInterval(consultarMensagensNovas, 2000);
 
         function mostrarNotificacao(titulo, texto) {
             const container = document.getElementById('toast-container');

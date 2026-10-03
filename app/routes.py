@@ -624,10 +624,44 @@ def get_chat(pessoa_id):
     mensagens_nao_lidas = Mensagem.query.filter_by(pessoa_id=pessoa_id, empresa_id=current_user.empresa_id, tipo='inbound', lida=False).all()
     for msg in mensagens_nao_lidas: msg.lida = True
     db.session.commit()
-    mensagens = Mensagem.query.filter_by(pessoa_id=pessoa.id, empresa_id=current_user.empresa_id).order_by(Mensagem.data_envio).all()
-    formatadas = [{"direcao": m.tipo, "conteudo": m.mensagem, "hora": m.data_envio.strftime("%H:%M") if m.data_envio else ""} for m in mensagens]
+    mensagens = Mensagem.query.filter_by(pessoa_id=pessoa.id, empresa_id=current_user.empresa_id).order_by(Mensagem.id).all()
+    formatadas = [_formatar_mensagem_chat(mensagem) for mensagem in mensagens]
     etiquetas = [{"id": etiqueta.id, "nome": etiqueta.nome} for etiqueta in pessoa.etiquetas]
     return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": formatadas, "etiquetas": etiquetas, "ia_ativa": pessoa.ia_ativa})
+
+
+def _formatar_mensagem_chat(mensagem):
+    return {
+        "id": mensagem.id,
+        "direcao": mensagem.tipo,
+        "conteudo": mensagem.mensagem,
+        "hora": mensagem.data_envio.strftime("%H:%M") if mensagem.data_envio else "",
+    }
+
+
+@bp.route('/api/mensagens/novas/<int:ultimo_id_mensagem>')
+@login_required
+def mensagens_novas(ultimo_id_mensagem):
+    pessoa_id = request.args.get('pessoa_id', type=int)
+    if not pessoa_id:
+        return jsonify({"erro": "Informe a conversa ativa."}), 400
+    pessoa = Pessoa.query.filter_by(
+        id=pessoa_id, empresa_id=current_user.empresa_id
+    ).first()
+    if not pessoa:
+        return jsonify({"erro": "Conversa não encontrada."}), 404
+
+    mensagens = Mensagem.query.filter(
+        Mensagem.empresa_id == current_user.empresa_id,
+        Mensagem.pessoa_id == pessoa.id,
+        Mensagem.id > ultimo_id_mensagem,
+    ).order_by(Mensagem.id).limit(100).all()
+    if any(mensagem.tipo == 'inbound' and not mensagem.lida for mensagem in mensagens):
+        for mensagem in mensagens:
+            if mensagem.tipo == 'inbound':
+                mensagem.lida = True
+        db.session.commit()
+    return jsonify([_formatar_mensagem_chat(mensagem) for mensagem in mensagens])
 
 
 @bp.route('/api/etiquetas', methods=['GET', 'POST'])

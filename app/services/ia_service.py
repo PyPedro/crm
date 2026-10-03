@@ -52,7 +52,7 @@ def gerar_resposta_ia(
         client = genai.Client(
             api_key=os.environ.get('GEMINI_API_KEY'),
             http_options=types.HttpOptions(
-                timeout=10_000,
+                timeout=5_000,
                 retry_options=types.HttpRetryOptions(attempts=1),
             ),
         )

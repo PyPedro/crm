@@ -102,6 +102,9 @@ class Mensagem(db.Model):
     tipo = db.Column(db.String(20)) # 'inbound' ou 'outbound'
     lida = db.Column(db.Boolean, default=False)
     data_envio = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        db.Index('ix_mensagem_empresa_pessoa_id', 'empresa_id', 'pessoa_id', 'id'),
+    )
 
 class Configuracao(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -114,6 +114,12 @@ def create_app(config_overrides=None):
                         f'ALTER TABLE "{table}" ADD COLUMN "{column}" {definition}'
                     ))
 
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                'CREATE INDEX IF NOT EXISTS "ix_mensagem_empresa_pessoa_id" '
+                'ON "mensagem" ("empresa_id", "pessoa_id", "id")'
+            ))
+
     return app
 
 # Expõe a instância WSGI para o Gunicorn em produção.
