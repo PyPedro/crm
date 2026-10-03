@@ -170,6 +170,7 @@ def _processar_payload(payload):
     pessoa = Pessoa.query.filter_by(
         empresa_id=empresa.id, telefone=telefone
     ).first()
+    atendimento_reaberto = False
     if not pessoa:
         primeira_etapa = Etapa.query.filter_by(
             empresa_id=empresa.id
@@ -195,6 +196,11 @@ def _processar_payload(payload):
             etapa_id=primeira_etapa.id,
             user_id=None,
         ))
+        db.session.commit()
+    elif pessoa.status_atendimento == 'fechado':
+        pessoa.status_atendimento = 'menu' if empresa.usar_menu_inicial else 'ia'
+        pessoa.ia_ativa = True
+        atendimento_reaberto = True
         db.session.commit()
 
     mensagem_db = texto_recebido
@@ -232,6 +238,20 @@ def _processar_payload(payload):
         data_envio=data_mensagem,
     ))
     db.session.commit()
+
+    if atendimento_reaberto:
+        if empresa.usar_menu_inicial:
+            mensagem_reinicio = _montar_texto_menu(empresa, pessoa)
+        else:
+            mensagem_reinicio = _personalizar_mensagem(
+                empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?',
+                empresa,
+                pessoa,
+            )
+        _enviar_resposta(
+            empresa.id, pessoa.id, telefone, instancia, mensagem_reinicio
+        )
+        return 'reopened'
 
     if pessoa.status_atendimento == 'humano':
         return 'human'

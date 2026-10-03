@@ -641,6 +641,21 @@ def get_chat(pessoa_id):
     return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": formatadas, "etiquetas": etiquetas, "ia_ativa": pessoa.ia_ativa})
 
 
+@bp.route('/api/atendimento/<int:contato_id>/encerrar', methods=['POST'])
+@login_required
+def encerrar_atendimento(contato_id):
+    pessoa = Pessoa.query.filter_by(
+        id=contato_id, empresa_id=current_user.empresa_id
+    ).first()
+    if not pessoa:
+        return jsonify({"erro": "Contato não encontrado."}), 404
+
+    pessoa.status_atendimento = 'fechado'
+    pessoa.ia_ativa = False
+    db.session.commit()
+    return jsonify({"status": "success"}), 200
+
+
 def _formatar_mensagem_chat(mensagem):
     data_envio = mensagem.data_envio
     if data_envio and data_envio.tzinfo is None:
