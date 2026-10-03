@@ -1,7 +1,15 @@
 from app import db
 from flask_login import UserMixin
 from datetime import datetime
+import pytz
 from sqlalchemy import UniqueConstraint
+
+
+FUSO_HORARIO_BR = pytz.timezone('America/Sao_Paulo')
+
+
+def hora_atual_br():
+    return datetime.now(FUSO_HORARIO_BR)
 
 
 pessoa_etiqueta = db.Table(
@@ -15,7 +23,7 @@ class Empresa(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
-    data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    data_criacao = db.Column(db.DateTime(timezone=True), nullable=False, default=hora_atual_br)
     is_ativa = db.Column(db.Boolean, default=True, nullable=False)
     usar_menu_inicial = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     mensagem_saudacao = db.Column(db.Text, nullable=False, default='Olá! Como podemos ajudar hoje?', server_default='Olá! Como podemos ajudar hoje?')
@@ -101,7 +109,7 @@ class Mensagem(db.Model):
     mensagem = db.Column(db.Text)
     tipo = db.Column(db.String(20)) # 'inbound' ou 'outbound'
     lida = db.Column(db.Boolean, default=False)
-    data_envio = db.Column(db.DateTime, default=datetime.utcnow)
+    data_envio = db.Column(db.DateTime(timezone=True), default=hora_atual_br)
     __table_args__ = (
         db.Index('ix_mensagem_empresa_pessoa_id', 'empresa_id', 'pessoa_id', 'id'),
     )

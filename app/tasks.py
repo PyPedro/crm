@@ -3,12 +3,22 @@ import logging
 from datetime import datetime
 
 import requests
+import pytz
 from flask import current_app
 from celery.signals import worker_process_init
 from google.genai import types
 
 from app import celery, db
-from app.models import Configuracao, Empresa, Etapa, Mensagem, Negocio, Pessoa
+from app.models import (
+    FUSO_HORARIO_BR,
+    Configuracao,
+    Empresa,
+    Etapa,
+    Mensagem,
+    Negocio,
+    Pessoa,
+    hora_atual_br,
+)
 from app.services.ia_service import gerar_resposta_ia
 from app.services.whatsapp import enviar_mensagem_whatsapp
 
@@ -48,9 +58,26 @@ def _enviar_resposta(empresa_id, pessoa_id, telefone, instancia, texto):
         pessoa_id=pessoa_id,
         mensagem=texto,
         tipo='outbound',
-        data_envio=datetime.now(),
+        data_envio=hora_atual_br(),
     ))
     db.session.commit()
+
+
+def _extrair_data_mensagem(data_payload, msg_data):
+    timestamp = msg_data.get('messageTimestamp')
+    if timestamp is None:
+        timestamp = data_payload.get('messageTimestamp')
+    if timestamp is None:
+        return hora_atual_br()
+
+    try:
+        timestamp = float(timestamp)
+        if abs(timestamp) >= 1_000_000_000_000:
+            timestamp /= 1000
+        return datetime.fromtimestamp(timestamp, tz=FUSO_HORARIO_BR)
+    except (TypeError, ValueError, OverflowError, OSError):
+        current_app.logger.warning('Timestamp inválido recebido da Evolution API: %r', timestamp)
+        return hora_atual_br()
 
 
 def _preparar_contexto_ia(empresa, pessoa):
@@ -114,6 +141,7 @@ def _processar_payload(payload):
     msg_data = data_payload.get('message') or {}
     if not isinstance(msg_data, dict):
         return 'ignored'
+    data_mensagem = _extrair_data_mensagem(data_payload, msg_data)
 
     media_type = next((
         tipo for campo, tipo in (
@@ -199,7 +227,7 @@ def _processar_payload(payload):
         pessoa_id=pessoa.id,
         mensagem=mensagem_db,
         tipo='inbound',
-        data_envio=datetime.now(),
+        data_envio=data_mensagem,
     ))
     db.session.commit()
 

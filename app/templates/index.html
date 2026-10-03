@@ -554,7 +554,13 @@
             }
             const hora = document.createElement('span');
             hora.className = `text-[10px] ${isInbound ? 'text-slate-400' : 'text-brand-200'} absolute bottom-1.5 right-3 font-bold`;
-            hora.textContent = msg.hora || '';
+            hora.textContent = msg.timestamp
+                ? new Intl.DateTimeFormat('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'America/Sao_Paulo',
+                }).format(new Date(msg.timestamp))
+                : (msg.hora || '');
             div.appendChild(hora);
             return div;
         }

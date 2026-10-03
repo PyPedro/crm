@@ -117,6 +117,28 @@ def create_app(config_overrides=None):
                         f'ALTER TABLE "{table}" ADD COLUMN "{column}" {definition}'
                     ))
 
+        if db.engine.dialect.name == 'postgresql':
+            timestamp_columns = {
+                'empresa': ('data_criacao',),
+                'mensagem': ('data_envio',),
+            }
+            pending_timezone_migrations = []
+            for table, columns in timestamp_columns.items():
+                existing = {
+                    column['name']: column
+                    for column in inspect(db.engine).get_columns(table)
+                }
+                for column_name in columns:
+                    if not getattr(existing[column_name]['type'], 'timezone', False):
+                        pending_timezone_migrations.append((table, column_name))
+            if pending_timezone_migrations:
+                with db.engine.begin() as connection:
+                    for table, column_name in pending_timezone_migrations:
+                        connection.execute(text(
+                            f'ALTER TABLE "{table}" ALTER COLUMN "{column_name}" '
+                            f'TYPE TIMESTAMP WITH TIME ZONE USING "{column_name}" AT TIME ZONE \'UTC\''
+                        ))
+
         with db.engine.begin() as connection:
             connection.execute(text(
                 'CREATE INDEX IF NOT EXISTS "ix_mensagem_empresa_pessoa_id" '

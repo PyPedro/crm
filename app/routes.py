@@ -4,16 +4,28 @@ import re
 import secrets
 import unicodedata
 import math
+import pytz
 from dotenv import load_dotenv, find_dotenv
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session
-from datetime import datetime
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 
 from app import oauth
-from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta
+from app.models import (
+    FUSO_HORARIO_BR,
+    db,
+    Empresa,
+    Etapa,
+    Negocio,
+    Pessoa,
+    Mensagem,
+    User,
+    Configuracao,
+    Etiqueta,
+    hora_atual_br,
+)
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from app.tasks import processar_mensagem_whatsapp
 
@@ -631,11 +643,19 @@ def get_chat(pessoa_id):
 
 
 def _formatar_mensagem_chat(mensagem):
+    data_envio = mensagem.data_envio
+    if data_envio and data_envio.tzinfo is None:
+        if db.engine.dialect.name == 'sqlite':
+            data_envio = FUSO_HORARIO_BR.localize(data_envio)
+        else:
+            data_envio = pytz.UTC.localize(data_envio)
+    data_envio_br = data_envio.astimezone(FUSO_HORARIO_BR) if data_envio else None
     return {
         "id": mensagem.id,
         "direcao": mensagem.tipo,
         "conteudo": mensagem.mensagem,
-        "hora": mensagem.data_envio.strftime("%H:%M") if mensagem.data_envio else "",
+        "timestamp": data_envio_br.isoformat() if data_envio_br else "",
+        "hora": data_envio_br.strftime("%H:%M") if data_envio_br else "",
     }
 
 
@@ -750,12 +770,12 @@ def send_message():
         mtype = 'image' if 'image' in mimetype else 'audio' if 'audio' in mimetype else 'video' if 'video' in mimetype else 'document'
         res = requests.post(f"{api_url}/message/sendMedia/{instance_name}", headers={"apikey": api_key}, json={"number": numero, "mediatype": mtype, "mimetype": mimetype, "caption": texto, "media": encoded, "fileName": dados.get('fileName', 'arquivo')})
         if res.status_code in [200, 201]:
-            db.session.add(Mensagem(empresa_id=current_user.empresa_id, pessoa_id=pessoa_id, mensagem=json.dumps({"type": mtype, "content": media_b64, "caption": texto}), tipo='outbound', data_envio=datetime.now()))
+            db.session.add(Mensagem(empresa_id=current_user.empresa_id, pessoa_id=pessoa_id, mensagem=json.dumps({"type": mtype, "content": media_b64, "caption": texto}), tipo='outbound', data_envio=hora_atual_br()))
             db.session.commit()
             return jsonify({"status": "sucesso"})
     else:
         if enviar_mensagem_whatsapp(numero, texto, instance_name):
-            db.session.add(Mensagem(empresa_id=current_user.empresa_id, pessoa_id=pessoa_id, mensagem=texto, tipo='outbound', data_envio=datetime.now()))
+            db.session.add(Mensagem(empresa_id=current_user.empresa_id, pessoa_id=pessoa_id, mensagem=texto, tipo='outbound', data_envio=hora_atual_br()))
             db.session.commit()
             return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Falha no envio"}), 500
