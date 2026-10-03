@@ -14,7 +14,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 
 from app import oauth
-from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta, MenuOpcao
+from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from google import genai
 from google.genai import types
@@ -410,88 +410,88 @@ def configuracoes_bot():
         return 'Acesso negado.', 403
 
     empresa = db.session.get(Empresa, current_user.empresa_id)
-    opcoes = MenuOpcao.query.filter_by(empresa_id=empresa.id).order_by(MenuOpcao.numero).all()
+    etapas = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).all()
     erro = None
-    opcoes_form = [
-        {"numero": str(opcao.numero), "descricao": opcao.descricao, "acao_destino": opcao.acao_destino}
-        for opcao in opcoes
-    ]
+    form_values = {}
 
     if request.method == 'POST':
         mensagem_saudacao = (request.form.get('mensagem_saudacao') or '').strip()
+        prompt_personalidade = (request.form.get('prompt_personalidade') or '').strip()
+        tom_resposta = (request.form.get('tom_resposta') or '').strip()
+        mensagem_transbordo = (request.form.get('mensagem_transbordo') or '').strip()
         usar_menu = request.form.get('usar_menu_inicial') == 'on'
-        numeros = request.form.getlist('opcao_numero')
-        descricoes = request.form.getlist('opcao_descricao')
-        destinos = request.form.getlist('opcao_destino')
-        opcoes_form = [
-            {"numero": numero.strip(), "descricao": descricao.strip(), "acao_destino": destino.strip()}
-            for numero, descricao, destino in zip(numeros, descricoes, destinos)
-        ]
-        novas_opcoes = []
+        etapas_menu = {}
+        ids_exibidos = set(request.form.getlist('etapa_exibir_no_menu'))
 
         if not mensagem_saudacao or len(mensagem_saudacao) > 2000:
             erro = 'A saudação deve ter entre 1 e 2000 caracteres.'
-        elif len(numeros) != len(descricoes) or len(numeros) != len(destinos):
-            erro = 'As opções enviadas estão incompletas.'
-        elif len(numeros) > 9:
-            erro = 'O menu pode ter no máximo 9 opções.'
+        elif not prompt_personalidade or len(prompt_personalidade) > 10000:
+            erro = 'As instruções de personalidade devem ter entre 1 e 10000 caracteres.'
+        elif not tom_resposta or len(tom_resposta) > 50:
+            erro = 'O tom de resposta deve ter entre 1 e 50 caracteres.'
+        elif not mensagem_transbordo or len(mensagem_transbordo) > 500:
+            erro = 'A mensagem de transbordo deve ter entre 1 e 500 caracteres.'
         else:
             numeros_usados = set()
-            for numero, descricao, destino in zip(numeros, descricoes, destinos):
-                numero = numero.strip()
-                descricao = descricao.strip()
-                destino = destino.strip()
-                if not numero and not descricao and not destino:
+            for etapa in etapas:
+                etapa_id = str(etapa.id)
+                numero = (request.form.get(f'etapa_numero_{etapa.id}') or '').strip()
+                if etapa_id not in ids_exibidos:
+                    etapas_menu[etapa.id] = None
                     continue
+                if len(numeros_usados) >= 9:
+                    erro = 'O menu pode ter no máximo 9 etapas.'
+                    break
                 try:
                     numero_int = int(numero)
                 except ValueError:
-                    erro = 'Cada opção precisa ter um número entre 1 e 9.'
+                    erro = 'Cada etapa do menu precisa ter um número entre 1 e 9.'
                     break
                 if numero_int < 1 or numero_int > 9 or numero_int in numeros_usados:
-                    erro = 'Os números devem ser únicos e ficar entre 1 e 9.'
-                    break
-                if not descricao or len(descricao) > 120:
-                    erro = 'A descrição deve ter entre 1 e 120 caracteres.'
-                    break
-                if destino not in {'ia', 'humano'}:
-                    erro = 'O destino deve ser IA ou atendente humano.'
+                    erro = 'Os números das etapas devem ser únicos e ficar entre 1 e 9.'
                     break
                 numeros_usados.add(numero_int)
-                novas_opcoes.append(MenuOpcao(
-                    empresa_id=empresa.id,
-                    numero=numero_int,
-                    descricao=descricao,
-                    acao_destino=destino,
-                ))
+                etapas_menu[etapa.id] = numero_int
 
-            if not erro and usar_menu and not novas_opcoes:
-                erro = 'Adicione ao menos uma opção antes de ativar o menu.'
+            if not erro and usar_menu and not numeros_usados:
+                erro = 'Selecione ao menos uma etapa antes de ativar o menu.'
 
+        form_values = {
+            'mensagem_saudacao': mensagem_saudacao,
+            'prompt_personalidade': prompt_personalidade,
+            'tom_resposta': tom_resposta,
+            'mensagem_transbordo': mensagem_transbordo,
+            'etapas_menu': etapas_menu,
+        }
         if erro:
             return render_template(
-                'configuracoes.html', empresa=empresa, opcoes=opcoes_form, erro=erro,
-                form_ativar=usar_menu, mensagem_form=mensagem_saudacao,
+                'configuracoes.html', empresa=empresa, etapas=etapas, erro=erro,
+                form_ativar=usar_menu, form_values=form_values,
             ), 400
 
         empresa.usar_menu_inicial = usar_menu
         empresa.mensagem_saudacao = mensagem_saudacao
-        MenuOpcao.query.filter_by(empresa_id=empresa.id).delete(synchronize_session=False)
-        db.session.add_all(novas_opcoes)
+        empresa.prompt_personalidade = prompt_personalidade
+        empresa.tom_resposta = tom_resposta
+        empresa.mensagem_transbordo = mensagem_transbordo
+        for etapa in etapas:
+            numero = etapas_menu.get(etapa.id)
+            etapa.exibir_no_menu = numero is not None
+            etapa.numero_menu = numero
         try:
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            current_app.logger.exception('Falha ao salvar as opções do menu da empresa %s', empresa.id)
+            current_app.logger.exception('Falha ao salvar as configurações da empresa %s', empresa.id)
             return render_template(
-                'configuracoes.html', empresa=empresa, opcoes=opcoes_form,
-                erro='Não foi possível salvar as opções. Revise os números e tente novamente.',
-                form_ativar=usar_menu, mensagem_form=mensagem_saudacao,
+                'configuracoes.html', empresa=empresa, etapas=etapas,
+                erro='Não foi possível salvar as configurações. Revise os dados e tente novamente.',
+                form_ativar=usar_menu, form_values=form_values,
             ), 409
         return redirect(url_for('main.configuracoes_bot', salvo=1))
 
     return render_template(
-        'configuracoes.html', empresa=empresa, opcoes=opcoes_form,
+        'configuracoes.html', empresa=empresa, etapas=etapas,
         salvo=request.args.get('salvo') == '1',
     )
 
@@ -739,8 +739,10 @@ def update_deal_stage():
 
 # --- WEBHOOK WHATSAPP (SEM LOGIN, INTERAGE COM IA) ---
 def montar_texto_menu(empresa):
-    opcoes = MenuOpcao.query.filter_by(empresa_id=empresa.id).order_by(MenuOpcao.numero).all()
-    linhas = [f'{opcao.numero} - {opcao.descricao}' for opcao in opcoes]
+    etapas = Etapa.query.filter_by(
+        empresa_id=empresa.id, exibir_no_menu=True
+    ).order_by(Etapa.numero_menu, Etapa.id).all()
+    linhas = [f'{etapa.numero_menu} - {etapa.nome}' for etapa in etapas]
     saudacao = empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?'
     return f'{saudacao}\n\n' + '\n'.join(linhas) if linhas else saudacao
 
@@ -757,9 +759,50 @@ def enviar_resposta_webhook(empresa_id, pessoa_id, telefone, instancia, texto):
         db.session.commit()
 
 
+def gerar_resposta_ia(empresa, pessoa, texto_recebido):
+    client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
+    config = Configuracao.query.filter_by(empresa_id=empresa.id).first()
+    sys_inst = (
+        f'Aja como assistente da empresa. Tom: {empresa.tom_resposta}. '
+        f'Regras: {empresa.prompt_personalidade}. SEJA EXTREMAMENTE CONCISO. '
+        'Não gaste tokens com respostas longas. Responda apenas com base no contexto.'
+    )
+    if config and config.prompt_ia:
+        sys_inst += f' Instruções adicionais: {config.prompt_ia}'
+
+    ultimas = Mensagem.query.filter_by(
+        empresa_id=empresa.id, pessoa_id=pessoa.id
+    ).order_by(Mensagem.id.desc()).limit(6).all()
+    ultimas.reverse()
+    historico = []
+    for mensagem in ultimas[:-1]:
+        texto_historico = mensagem.mensagem
+        try:
+            texto_historico = json.loads(mensagem.mensagem).get('caption', '[Arquivo]')
+        except (TypeError, ValueError):
+            pass
+        historico.append(types.Content(
+            role='user' if mensagem.tipo == 'inbound' else 'model',
+            parts=[types.Part.from_text(text=texto_historico)],
+        ))
+
+    chat = client.chats.create(
+        model='gemini-3.6-flash',
+        config=types.GenerateContentConfig(
+            system_instruction=sys_inst,
+            temperature=0.4,
+        ),
+        history=historico,
+    )
+    resposta = chat.send_message(texto_recebido).text
+    if not resposta or not resposta.strip():
+        raise RuntimeError('O Gemini retornou uma resposta vazia.')
+    return resposta.strip()
+
+
 @bp.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
-    dados = request.json
+    dados = request.get_json(silent=True) or {}
     remote_jid = dados.get('data', {}).get('key', {}).get('remoteJid', '')
     if '@g.us' in remote_jid:
         print("Webhook ignorado: mensagem de grupo.")
@@ -794,9 +837,6 @@ def webhook_whatsapp():
 
         if telefone_remetente and (texto_recebido or is_media):
             pessoa = Pessoa.query.filter_by(empresa_id=empresa.id, telefone=telefone_remetente).first()
-            primeira_mensagem = pessoa is None or not Mensagem.query.filter_by(
-                empresa_id=empresa.id, pessoa_id=pessoa.id, tipo='inbound'
-            ).first()
             if not pessoa:
                 pessoa = Pessoa(
                     empresa_id=empresa.id,
@@ -812,9 +852,6 @@ def webhook_whatsapp():
                     return jsonify({"erro": "A empresa não possui etapas configuradas"}), 500
                 db.session.add(Negocio(empresa_id=empresa.id, titulo=f"Op. - {telefone_remetente}", pessoa_id=pessoa.id, etapa_id=primeira_etapa.id, user_id=None))
                 db.session.commit()
-            elif primeira_mensagem and empresa.usar_menu_inicial:
-                pessoa.status_atendimento = 'menu'
-                pessoa.ia_ativa = True
 
             msg_db = texto_recebido
             if is_media:
@@ -831,47 +868,42 @@ def webhook_whatsapp():
             db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
             db.session.commit()
 
-            if primeira_mensagem and empresa.usar_menu_inicial:
-                enviar_resposta_webhook(
-                    empresa.id, pessoa.id, telefone_remetente, nome_instancia,
-                    montar_texto_menu(empresa),
-                )
-                return jsonify({"status": "processado", "atendimento": "menu"}), 200
+            # O estado humano é terminal para o bot: registre a entrada e não responda.
+            if pessoa.status_atendimento == 'humano':
+                return jsonify({"status": "processado", "atendimento": "humano"}), 200
 
             if pessoa.status_atendimento == 'menu':
-                if not empresa.usar_menu_inicial:
-                    pessoa.status_atendimento = 'ia'
-                    pessoa.ia_ativa = True
+                texto_opcao = (texto_recebido or '').strip()
+                etapa = None
+                if texto_opcao.isdecimal():
+                    etapa = Etapa.query.filter_by(
+                        empresa_id=empresa.id,
+                        exibir_no_menu=True,
+                        numero_menu=int(texto_opcao),
+                    ).first()
+                if etapa:
+                    negocio = Negocio.query.filter_by(
+                        empresa_id=empresa.id, pessoa_id=pessoa.id
+                    ).order_by(Negocio.id).first()
+                    if negocio:
+                        negocio.etapa_id = etapa.id
+                    pessoa.status_atendimento = 'humano'
+                    pessoa.ia_ativa = False
                     db.session.commit()
+                    enviar_resposta_webhook(
+                        empresa.id, pessoa.id, telefone_remetente,
+                        nome_instancia, empresa.mensagem_transbordo,
+                    )
+                    return jsonify({"status": "processado", "atendimento": "humano"}), 200
                 else:
-                    texto_opcao = (texto_recebido or '').strip()
-                    opcao = None
-                    if texto_opcao.isdigit():
-                        opcao = MenuOpcao.query.filter_by(
-                            empresa_id=empresa.id, numero=int(texto_opcao)
-                        ).first()
-                    if opcao:
-                        pessoa.status_atendimento = opcao.acao_destino
-                        pessoa.ia_ativa = opcao.acao_destino == 'ia'
-                        db.session.commit()
-                        confirmacao = (
-                            'Pode fazer a sua pergunta para a nossa IA!'
-                            if opcao.acao_destino == 'ia'
-                            else 'Transferindo para um atendente...'
-                        )
-                        enviar_resposta_webhook(
-                            empresa.id, pessoa.id, telefone_remetente,
-                            nome_instancia, confirmacao,
-                        )
-                    else:
-                        enviar_resposta_webhook(
-                            empresa.id, pessoa.id, telefone_remetente,
-                            nome_instancia, montar_texto_menu(empresa),
-                        )
-                    return jsonify({"status": "processado", "atendimento": "menu"}), 200
+                    enviar_resposta_webhook(
+                        empresa.id, pessoa.id, telefone_remetente,
+                        nome_instancia, montar_texto_menu(empresa),
+                    )
+                return jsonify({"status": "processado", "atendimento": "menu"}), 200
 
-            if pessoa.status_atendimento == 'humano' or not pessoa.ia_ativa:
-                return jsonify({"status": "processado", "atendimento": "humano"}), 200
+            if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
+                return jsonify({"status": "processado", "atendimento": pessoa.status_atendimento}), 200
 
             try:
                 requests.post(
@@ -883,41 +915,30 @@ def webhook_whatsapp():
             except requests.RequestException as erro:
                 current_app.logger.warning('Não foi possível enviar presença de digitação: %s', erro)
 
-            # IA Triage com NOVO google.genai e Fallback de Segurança
             try:
-                chave_gemini = os.environ.get('GEMINI_API_KEY')
-                client = genai.Client(api_key=chave_gemini)
-                config = Configuracao.query.filter_by(empresa_id=empresa.id).first()
-                sys_inst = config.prompt_ia if config and config.prompt_ia else "Atuas como assistente virtual. Transfira para um humano se necessário usando [TRANSFERIR]."
+                resposta_bot = gerar_resposta_ia(empresa, pessoa, texto_recebido)
+            except Exception:
+                current_app.logger.exception(
+                    'Falha na IA para pessoa %s da empresa %s', pessoa.id, empresa.id
+                )
+                pessoa.status_atendimento = 'humano'
+                pessoa.ia_ativa = False
+                db.session.commit()
+                enviar_resposta_webhook(
+                    empresa.id, pessoa.id, telefone_remetente,
+                    nome_instancia, empresa.mensagem_transbordo,
+                )
+                return jsonify({"status": "processado", "atendimento": "humano"}), 200
 
-                ultimas = Mensagem.query.filter_by(empresa_id=empresa.id, pessoa_id=pessoa.id).order_by(Mensagem.id.desc()).limit(6).all()
-                ultimas.reverse()
-                historico = []
-                for m in ultimas[:-1]:
-                    th = m.mensagem
-                    try: th = json.loads(m.mensagem).get("caption", "[Arquivo]")
-                    except: pass
-                    historico.append(types.Content(role="user" if m.tipo == 'inbound' else "model", parts=[types.Part.from_text(text=th)]))
-                
-                try:
-                    chat = client.chats.create(model="gemini-3.6-flash", config=types.GenerateContentConfig(system_instruction=sys_inst, temperature=0.8), history=historico)
-                    resposta_bot = chat.send_message(texto_recebido).text
-                except Exception:
-                    chat_fallback = client.chats.create(model="gemini-1.5-flash", config=types.GenerateContentConfig(system_instruction=sys_inst, temperature=0.8), history=historico)
-                    resposta_bot = chat_fallback.send_message(texto_recebido).text
-
-                if "[TRANSFERIR]" in resposta_bot:
-                    resposta_bot = resposta_bot.replace("[TRANSFERIR]", "").strip() or "Vou transferir a conversa para um consultor."
-                    negocio = Negocio.query.filter_by(empresa_id=empresa.id, pessoa_id=pessoa.id).first()
-                    primeira_etapa = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).first()
-                    etapa_contato = Etapa.query.filter_by(empresa_id=empresa.id, nome='Contato Feito').first()
-                    if negocio and primeira_etapa and etapa_contato and negocio.etapa_id == primeira_etapa.id:
-                        negocio.etapa_id = etapa_contato.id
-                    pessoa.status_atendimento = 'humano'
-                    pessoa.ia_ativa = False
-                    db.session.commit()
-            except Exception as e:
-                resposta_bot = "Olá! A nossa assistente virtual está temporariamente indisponível. Um consultor assumirá o atendimento."
+            if '[TRANSFERIR]' in resposta_bot:
+                pessoa.status_atendimento = 'humano'
+                pessoa.ia_ativa = False
+                db.session.commit()
+                enviar_resposta_webhook(
+                    empresa.id, pessoa.id, telefone_remetente,
+                    nome_instancia, empresa.mensagem_transbordo,
+                )
+                return jsonify({"status": "processado", "atendimento": "humano"}), 200
 
             if resposta_bot:
                 enviar_resposta_webhook(

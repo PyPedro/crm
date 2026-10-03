@@ -45,61 +45,41 @@
                     </label>
                 </div>
                 <label for="mensagem-saudacao" class="mt-6 block text-sm font-semibold text-slate-700">Mensagem de saudação</label>
-                <textarea id="mensagem-saudacao" name="mensagem_saudacao" maxlength="2000" rows="4" required class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">{{ mensagem_form if mensagem_form is defined else empresa.mensagem_saudacao }}</textarea>
+                <textarea id="mensagem-saudacao" name="mensagem_saudacao" maxlength="2000" rows="4" required class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">{{ form_values.mensagem_saudacao if form_values is defined else empresa.mensagem_saudacao }}</textarea>
             </section>
 
             <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div class="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-900">Opções do menu</h2>
-                        <p class="mt-1 text-sm text-slate-500">Use números de 1 a 9 e escolha o destino de cada resposta.</p>
+                <div class="mb-5">
+                    <h2 class="text-base font-bold text-slate-900">Etapas disponíveis no menu</h2>
+                    <p class="mt-1 text-sm text-slate-500">Selecione as etapas do Kanban e atribua um número único de 1 a 9.</p>
+                </div>
+                <div class="space-y-3">
+                    {% for etapa in etapas %}
+                    {% set numero_etapa = form_values.etapas_menu.get(etapa.id) if form_values is defined else etapa.numero_menu %}
+                    {% set etapa_marcada = (etapa.id|string) in request.form.getlist('etapa_exibir_no_menu') if form_values is defined else etapa.exibir_no_menu %}
+                    <div class="grid grid-cols-[minmax(0,1fr)_100px] items-center gap-4 rounded-lg border border-slate-200 p-3">
+                        <label class="flex min-w-0 items-center gap-3 text-sm font-semibold text-slate-700">
+                            <input type="checkbox" name="etapa_exibir_no_menu" value="{{ etapa.id }}" {% if etapa_marcada %}checked{% endif %} class="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                            <span class="truncate">{{ etapa.nome }}</span>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-600">Número
+                            <input type="number" name="etapa_numero_{{ etapa.id }}" min="1" max="9" value="{{ numero_etapa if numero_etapa is not none else '' }}" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
+                        </label>
                     </div>
-                    <button type="button" onclick="adicionarOpcao()" class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m-7-7h14"/></svg>
-                        Adicionar opção
-                    </button>
-                </div>
-                <div id="opcoes-menu" class="space-y-3">
-                    {% if opcoes %}
-                        {% for opcao in opcoes %}
-                        <div data-opcao class="grid grid-cols-1 items-end gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[90px_minmax(0,1fr)_180px_40px]">
-                            <label class="text-xs font-semibold text-slate-600">Número
-                                <input type="number" name="opcao_numero" min="1" max="9" value="{{ opcao.numero }}" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                            </label>
-                            <label class="text-xs font-semibold text-slate-600">Descrição
-                                <input type="text" name="opcao_descricao" maxlength="120" value="{{ opcao.descricao }}" placeholder="Ex.: Falar com Vendas" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                            </label>
-                            <label class="text-xs font-semibold text-slate-600">Direcionar para
-                                <select name="opcao_destino" class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                                    <option value="ia" {% if opcao.acao_destino == 'ia' %}selected{% endif %}>Assistente de IA</option>
-                                    <option value="humano" {% if opcao.acao_destino == 'humano' %}selected{% endif %}>Atendente humano</option>
-                                </select>
-                            </label>
-                            <button type="button" onclick="removerOpcao(this)" title="Remover opção" aria-label="Remover opção" class="mb-0.5 flex h-9 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-700">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
-                        {% endfor %}
                     {% else %}
-                        <div data-opcao class="grid grid-cols-1 items-end gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[90px_minmax(0,1fr)_180px_40px]">
-                            <label class="text-xs font-semibold text-slate-600">Número
-                                <input type="number" name="opcao_numero" min="1" max="9" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                            </label>
-                            <label class="text-xs font-semibold text-slate-600">Descrição
-                                <input type="text" name="opcao_descricao" maxlength="120" placeholder="Ex.: Falar com Vendas" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                            </label>
-                            <label class="text-xs font-semibold text-slate-600">Direcionar para
-                                <select name="opcao_destino" class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                                    <option value="ia">Assistente de IA</option>
-                                    <option value="humano">Atendente humano</option>
-                                </select>
-                            </label>
-                            <button type="button" onclick="removerOpcao(this)" title="Remover opção" aria-label="Remover opção" class="mb-0.5 flex h-9 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-700">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
-                    {% endif %}
+                    <p class="rounded-lg border border-slate-200 px-3 py-4 text-sm text-slate-500">Cadastre etapas no Kanban antes de configurar o menu.</p>
+                    {% endfor %}
                 </div>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 class="text-base font-bold text-slate-900">Personalização da assistente</h2>
+                <label for="tom-resposta" class="mt-5 block text-sm font-semibold text-slate-700">Tom de resposta</label>
+                <input id="tom-resposta" name="tom_resposta" maxlength="50" required value="{{ form_values.tom_resposta if form_values is defined else empresa.tom_resposta }}" class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                <label for="prompt-personalidade" class="mt-5 block text-sm font-semibold text-slate-700">Instruções de personalidade</label>
+                <textarea id="prompt-personalidade" name="prompt_personalidade" maxlength="10000" rows="5" required class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">{{ form_values.prompt_personalidade if form_values is defined else empresa.prompt_personalidade }}</textarea>
+                <label for="mensagem-transbordo" class="mt-5 block text-sm font-semibold text-slate-700">Mensagem ao transferir para um consultor</label>
+                <textarea id="mensagem-transbordo" name="mensagem_transbordo" maxlength="500" rows="3" required class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">{{ form_values.mensagem_transbordo if form_values is defined else empresa.mensagem_transbordo }}</textarea>
             </section>
 
             <div class="flex justify-end">
@@ -110,37 +90,5 @@
             </div>
         </form>
     </main>
-
-    <script>
-        function adicionarOpcao() {
-            const container = document.getElementById('opcoes-menu');
-            if (container.querySelectorAll('[data-opcao]').length >= 9) return;
-            const linha = document.createElement('div');
-            linha.dataset.opcao = '';
-            linha.className = 'grid grid-cols-1 items-end gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[90px_minmax(0,1fr)_180px_40px]';
-            linha.innerHTML = `
-                <label class="text-xs font-semibold text-slate-600">Número
-                    <input type="number" name="opcao_numero" min="1" max="9" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                </label>
-                <label class="text-xs font-semibold text-slate-600">Descrição
-                    <input type="text" name="opcao_descricao" maxlength="120" placeholder="Ex.: Falar com Vendas" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                </label>
-                <label class="text-xs font-semibold text-slate-600">Direcionar para
-                    <select name="opcao_destino" class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                        <option value="ia">Assistente de IA</option>
-                        <option value="humano">Atendente humano</option>
-                    </select>
-                </label>
-                <button type="button" title="Remover opção" aria-label="Remover opção" class="mb-0.5 flex h-9 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-700">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6 18 18"/></svg>
-                </button>`;
-            linha.querySelector('button').addEventListener('click', () => linha.remove());
-            container.appendChild(linha);
-        }
-
-        function removerOpcao(botao) {
-            botao.closest('[data-opcao]').remove();
-        }
-    </script>
 </body>
 </html>

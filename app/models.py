@@ -19,6 +19,9 @@ class Empresa(db.Model):
     is_ativa = db.Column(db.Boolean, default=True, nullable=False)
     usar_menu_inicial = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     mensagem_saudacao = db.Column(db.Text, nullable=False, default='Olá! Como podemos ajudar hoje?', server_default='Olá! Como podemos ajudar hoje?')
+    prompt_personalidade = db.Column(db.Text, nullable=False, default='Responda de forma curta, direta e amigável.', server_default='Responda de forma curta, direta e amigável.')
+    tom_resposta = db.Column(db.String(50), nullable=False, default='Profissional', server_default='Profissional')
+    mensagem_transbordo = db.Column(db.String(500), nullable=False, default='Vou transferir o seu atendimento para um de nossos consultores. Aguarde um momento!', server_default='Vou transferir o seu atendimento para um de nossos consultores. Aguarde um momento!')
 
     users = db.relationship('User', backref='empresa', cascade='all, delete-orphan', lazy=True)
     etapas = db.relationship('Etapa', backref='empresa', cascade='all, delete-orphan', lazy=True)
@@ -77,6 +80,8 @@ class Etapa(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False, index=True)
     nome = db.Column(db.String(50))
+    exibir_no_menu = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    numero_menu = db.Column(db.Integer, nullable=True)
     negocios = db.relationship('Negocio', backref='etapa', lazy=True)
 
 class Negocio(db.Model):

@@ -57,6 +57,13 @@ def create_app(config_overrides=None):
             'empresa': {
                 'usar_menu_inicial': 'BOOLEAN NOT NULL DEFAULT FALSE',
                 'mensagem_saudacao': "TEXT NOT NULL DEFAULT 'Olá! Como podemos ajudar hoje?'",
+                'prompt_personalidade': "TEXT NOT NULL DEFAULT 'Responda de forma curta, direta e amigável.'",
+                'tom_resposta': "VARCHAR(50) NOT NULL DEFAULT 'Profissional'",
+                'mensagem_transbordo': "VARCHAR(500) NOT NULL DEFAULT 'Vou transferir o seu atendimento para um de nossos consultores. Aguarde um momento!'",
+            },
+            'etapa': {
+                'exibir_no_menu': 'BOOLEAN NOT NULL DEFAULT FALSE',
+                'numero_menu': 'INTEGER',
             },
             'pessoa': {
                 'ia_ativa': 'BOOLEAN NOT NULL DEFAULT TRUE',
