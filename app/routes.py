@@ -220,9 +220,9 @@ def authorize_google():
     if not email or not google_id or not perfil.get('email_verified'):
         return redirect(url_for('main.login', msg='O Google não confirmou um endereço de e-mail válido.'))
 
-    user = User.query.filter_by(google_id=google_id).first()
+    user = User.query.filter_by(email=email).first()
     if not user:
-        user = User.query.filter_by(email=email).first()
+        user = User.query.filter_by(google_id=google_id).first()
     if user:
         if user.google_id and user.google_id != google_id:
             return redirect(url_for('main.login', msg='Este e-mail está associado a outra conta Google.'))
@@ -235,39 +235,86 @@ def authorize_google():
         login_user(user)
         return redirect(url_for('main.index'))
 
+    session['registro_google_email'] = email
+    session['registro_google_google_id'] = google_id
+    return redirect(url_for('main.completar_cadastro'))
+
+
+@bp.route('/completar_cadastro', methods=['GET', 'POST'])
+def completar_cadastro():
+    email = session.get('registro_google_email')
+    google_id = session.get('registro_google_google_id')
+    if not email or not google_id:
+        flash('Inicie o cadastro novamente com a sua conta Google.', 'warning')
+        return redirect(url_for('main.login'))
+
+    if request.method == 'GET':
+        return render_template('completar_cadastro.html', email=email)
+
+    nome_utilizador = (request.form.get('nome_utilizador') or '').strip()
+    nome_empresa = (request.form.get('nome_empresa') or '').strip()
+    if not nome_utilizador or len(nome_utilizador) > 50:
+        return render_template(
+            'completar_cadastro.html', email=email,
+            erro='Informe um nome com até 50 caracteres.',
+            nome_utilizador=nome_utilizador, nome_empresa=nome_empresa,
+        ), 400
+    if not nome_empresa or len(nome_empresa) > 120:
+        return render_template(
+            'completar_cadastro.html', email=email,
+            erro='Informe o nome da empresa com até 120 caracteres.',
+            nome_utilizador=nome_utilizador, nome_empresa=nome_empresa,
+        ), 400
+    if User.query.filter_by(email=email).first():
+        session.pop('registro_google_email', None)
+        session.pop('registro_google_google_id', None)
+        flash('Esta conta já está registada. Faça login para continuar.', 'warning')
+        return redirect(url_for('main.login'))
+    if User.query.filter_by(username=nome_utilizador).first():
+        return render_template(
+            'completar_cadastro.html', email=email,
+            erro='Este nome de utilizador já está em uso.',
+            nome_utilizador=nome_utilizador, nome_empresa=nome_empresa,
+        ), 409
+
     try:
-        instancia = configurar_instancia_whatsapp(f'Empresa de {nome}')
-    except (RuntimeError, requests.RequestException):
-        return redirect(url_for('main.login', msg='Não foi possível preparar o WhatsApp para a nova empresa. Tente novamente.'))
+        instancia = configurar_instancia_whatsapp(nome_empresa)
+    except RuntimeError as erro:
+        return render_template(
+            'completar_cadastro.html', email=email, erro=str(erro),
+            nome_utilizador=nome_utilizador, nome_empresa=nome_empresa,
+        ), 503
+    except requests.RequestException:
+        return render_template(
+            'completar_cadastro.html', email=email,
+            erro='Não foi possível preparar o WhatsApp. Tente novamente.',
+            nome_utilizador=nome_utilizador, nome_empresa=nome_empresa,
+        ), 502
 
     empresa = Empresa(
-        nome=f'Empresa de {nome}'[:120],
+        nome=nome_empresa,
         instancia_whatsapp=instancia,
         is_ativa=False,
     )
     db.session.add(empresa)
     db.session.flush()
-    username_base = re.sub(r'[^a-zA-Z0-9_.-]+', '', email.split('@')[0])[:40] or 'google'
-    username = f'{username_base}-{secrets.token_hex(3)}'
-    novo_user = User(
+    db.session.add(User(
         empresa_id=empresa.id,
-        username=username,
+        username=nome_utilizador,
         email=email,
         google_id=google_id,
         password_hash=generate_password_hash(secrets.token_urlsafe(32)),
         is_admin=True,
-    )
-    db.session.add(novo_user)
+    ))
     db.session.add_all([
         Etapa(empresa_id=empresa.id, nome=etapa)
         for etapa in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')
     ])
     db.session.add(Configuracao(empresa_id=empresa.id))
     db.session.commit()
-    flash(
-        'Cadastro realizado! A sua conta passará por uma análise e será ativada em breve pela nossa equipa.',
-        'success',
-    )
+    session.pop('registro_google_email', None)
+    session.pop('registro_google_google_id', None)
+    flash('Cadastro recebido! Aguarde a aprovação do administrador.', 'warning')
     return redirect(url_for('main.login'))
 
 @bp.route('/logout')
@@ -693,11 +740,12 @@ def get_chat(pessoa_id):
     return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": formatadas, "etiquetas": etiquetas, "ia_ativa": pessoa.ia_ativa})
 
 
-@bp.route('/api/atendimento/<int:contato_id>/encerrar', methods=['POST'])
+@bp.route('/api/encerrar_atendimento/<int:pessoa_id>', methods=['POST'])
+@bp.route('/api/atendimento/<int:pessoa_id>/encerrar', methods=['POST'])
 @login_required
-def encerrar_atendimento(contato_id):
+def encerrar_atendimento(pessoa_id):
     pessoa = Pessoa.query.filter_by(
-        id=contato_id, empresa_id=current_user.empresa_id
+        id=pessoa_id, empresa_id=current_user.empresa_id
     ).first()
     if not pessoa:
         return jsonify({"erro": "Contato não encontrado."}), 404
