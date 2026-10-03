@@ -74,7 +74,9 @@ def _extrair_data_mensagem(data_payload, msg_data):
         timestamp = float(timestamp)
         if abs(timestamp) >= 1_000_000_000_000:
             timestamp /= 1000
-        return datetime.fromtimestamp(timestamp, tz=FUSO_HORARIO_BR)
+        return datetime.fromtimestamp(
+            timestamp, tz=FUSO_HORARIO_BR
+        ).replace(tzinfo=None)
     except (TypeError, ValueError, OverflowError, OSError):
         current_app.logger.warning('Timestamp inválido recebido da Evolution API: %r', timestamp)
         return hora_atual_br()

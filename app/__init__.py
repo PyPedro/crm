@@ -129,14 +129,15 @@ def create_app(config_overrides=None):
                     for column in inspect(db.engine).get_columns(table)
                 }
                 for column_name in columns:
-                    if not getattr(existing[column_name]['type'], 'timezone', False):
+                    if getattr(existing[column_name]['type'], 'timezone', False):
                         pending_timezone_migrations.append((table, column_name))
             if pending_timezone_migrations:
                 with db.engine.begin() as connection:
                     for table, column_name in pending_timezone_migrations:
                         connection.execute(text(
                             f'ALTER TABLE "{table}" ALTER COLUMN "{column_name}" '
-                            f'TYPE TIMESTAMP WITH TIME ZONE USING "{column_name}" AT TIME ZONE \'UTC\''
+                            f'TYPE TIMESTAMP WITHOUT TIME ZONE USING "{column_name}" '
+                            'AT TIME ZONE \'America/Recife\''
                         ))
 
         with db.engine.begin() as connection:

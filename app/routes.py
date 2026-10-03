@@ -4,7 +4,6 @@ import re
 import secrets
 import unicodedata
 import math
-import pytz
 from dotenv import load_dotenv, find_dotenv
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session
 from flask_login import login_user, logout_user, login_required, current_user
@@ -645,16 +644,16 @@ def get_chat(pessoa_id):
 def _formatar_mensagem_chat(mensagem):
     data_envio = mensagem.data_envio
     if data_envio and data_envio.tzinfo is None:
-        if db.engine.dialect.name == 'sqlite':
-            data_envio = FUSO_HORARIO_BR.localize(data_envio)
-        else:
-            data_envio = pytz.UTC.localize(data_envio)
-    data_envio_br = data_envio.astimezone(FUSO_HORARIO_BR) if data_envio else None
+        data_envio_br = FUSO_HORARIO_BR.localize(data_envio)
+    elif data_envio:
+        data_envio_br = data_envio.astimezone(FUSO_HORARIO_BR)
+    else:
+        data_envio_br = None
     return {
         "id": mensagem.id,
         "direcao": mensagem.tipo,
         "conteudo": mensagem.mensagem,
-        "timestamp": data_envio_br.isoformat() if data_envio_br else "",
+        "data_envio": data_envio_br.isoformat() if data_envio_br else "",
         "hora": data_envio_br.strftime("%H:%M") if data_envio_br else "",
     }
 
