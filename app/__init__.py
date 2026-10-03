@@ -3,6 +3,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from authlib.integrations.flask_client import OAuth
+from celery import Celery
 from sqlalchemy import inspect, text
 from dotenv import load_dotenv, find_dotenv
 
@@ -12,6 +13,21 @@ load_dotenv(find_dotenv(), override=True)
 db = SQLAlchemy()
 login_manager = LoginManager()
 oauth = OAuth()
+celery = Celery('optmiza')
+
+
+class FlaskContextTask(celery.Task):
+    def __call__(self, *args, **kwargs):
+        flask_app = self.app.flask_app
+        with flask_app.app_context():
+            try:
+                return self.run(*args, **kwargs)
+            except Exception:
+                db.session.rollback()
+                raise
+
+
+celery.Task = FlaskContextTask
 
 def create_app(config_overrides=None):
     app = Flask(__name__)
@@ -26,7 +42,18 @@ def create_app(config_overrides=None):
     app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
     app.config['GOOGLE_REDIRECT_URI'] = os.environ.get('GOOGLE_REDIRECT_URI')
     app.config.update(config_overrides or {})
+    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    app.config.setdefault('CELERY_BROKER_URL', os.environ.get('CELERY_BROKER_URL', redis_url))
+    app.config.setdefault('CELERY_RESULT_BACKEND', os.environ.get('CELERY_RESULT_BACKEND', redis_url))
     app.config['INSTANCE_NAME'] = os.environ.get('INSTANCE_NAME')
+
+    celery.conf.update(
+        broker_url=app.config['CELERY_BROKER_URL'],
+        result_backend=app.config['CELERY_RESULT_BACKEND'],
+        broker_connection_retry_on_startup=True,
+    )
+    celery.flask_app = app
+    app.extensions['celery'] = celery
 
     db.init_app(app)
     oauth.init_app(app)

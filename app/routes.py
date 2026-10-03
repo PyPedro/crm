@@ -1,4 +1,3 @@
-import os
 import requests
 import json
 import re
@@ -16,8 +15,7 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignat
 from app import oauth
 from app.models import db, Empresa, Etapa, Negocio, Pessoa, Mensagem, User, Configuracao, Etiqueta
 from app.services.whatsapp import enviar_mensagem_whatsapp
-from google import genai
-from google.genai import types
+from app.tasks import processar_mensagem_whatsapp
 
 load_dotenv(find_dotenv(), override=True)
 bp = Blueprint('main', __name__)
@@ -416,7 +414,9 @@ def configuracoes_bot():
 
     if request.method == 'POST':
         mensagem_saudacao = (request.form.get('mensagem_saudacao') or '').strip()
-        prompt_personalidade = (request.form.get('prompt_personalidade') or '').strip()
+        prompt_personalidade = (
+            request.form.get('prompt_personalidade') or ''
+        ).strip() or 'Responda de forma curta, direta e amigável.'
         tom_resposta = (request.form.get('tom_resposta') or '').strip()
         mensagem_transbordo = (request.form.get('mensagem_transbordo') or '').strip()
         usar_menu = request.form.get('usar_menu_inicial') == 'on'
@@ -425,10 +425,10 @@ def configuracoes_bot():
 
         if not mensagem_saudacao or len(mensagem_saudacao) > 2000:
             erro = 'A saudação deve ter entre 1 e 2000 caracteres.'
-        elif not prompt_personalidade or len(prompt_personalidade) > 10000:
-            erro = 'As instruções de personalidade devem ter entre 1 e 10000 caracteres.'
-        elif not tom_resposta or len(tom_resposta) > 50:
-            erro = 'O tom de resposta deve ter entre 1 e 50 caracteres.'
+        elif len(prompt_personalidade) > 10000:
+            erro = 'As orientações para a assistente devem ter no máximo 10000 caracteres.'
+        elif tom_resposta not in {'Profissional', 'Descontraído', 'Empático'}:
+            erro = 'Escolha um dos tons de resposta disponíveis.'
         elif not mensagem_transbordo or len(mensagem_transbordo) > 500:
             erro = 'A mensagem de transbordo deve ter entre 1 e 500 caracteres.'
         else:
@@ -737,217 +737,19 @@ def update_deal_stage():
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Não encontrado"}), 404
 
-# --- WEBHOOK WHATSAPP (SEM LOGIN, INTERAGE COM IA) ---
-def montar_texto_menu(empresa):
-    etapas = Etapa.query.filter_by(
-        empresa_id=empresa.id, exibir_no_menu=True
-    ).order_by(Etapa.numero_menu, Etapa.id).all()
-    linhas = [f'{etapa.numero_menu} - {etapa.nome}' for etapa in etapas]
-    saudacao = empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?'
-    return f'{saudacao}\n\n' + '\n'.join(linhas) if linhas else saudacao
-
-
-def enviar_resposta_webhook(empresa_id, pessoa_id, telefone, instancia, texto):
-    if enviar_mensagem_whatsapp(telefone, texto, instancia):
-        db.session.add(Mensagem(
-            empresa_id=empresa_id,
-            pessoa_id=pessoa_id,
-            mensagem=texto,
-            tipo='outbound',
-            data_envio=datetime.now(),
-        ))
-        db.session.commit()
-
-
-def gerar_resposta_ia(empresa, pessoa, texto_recebido):
-    client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
-    config = Configuracao.query.filter_by(empresa_id=empresa.id).first()
-    sys_inst = (
-        f'Aja como assistente da empresa. Tom: {empresa.tom_resposta}. '
-        f'Regras: {empresa.prompt_personalidade}. SEJA EXTREMAMENTE CONCISO. '
-        'Não gaste tokens com respostas longas. Responda apenas com base no contexto.'
-    )
-    if config and config.prompt_ia:
-        sys_inst += f' Instruções adicionais: {config.prompt_ia}'
-
-    ultimas = Mensagem.query.filter_by(
-        empresa_id=empresa.id, pessoa_id=pessoa.id
-    ).order_by(Mensagem.id.desc()).limit(6).all()
-    ultimas.reverse()
-    historico = []
-    for mensagem in ultimas[:-1]:
-        texto_historico = mensagem.mensagem
-        try:
-            texto_historico = json.loads(mensagem.mensagem).get('caption', '[Arquivo]')
-        except (TypeError, ValueError):
-            pass
-        historico.append(types.Content(
-            role='user' if mensagem.tipo == 'inbound' else 'model',
-            parts=[types.Part.from_text(text=texto_historico)],
-        ))
-
-    chat = client.chats.create(
-        model='gemini-3.6-flash',
-        config=types.GenerateContentConfig(
-            system_instruction=sys_inst,
-            temperature=0.4,
-        ),
-        history=historico,
-    )
-    resposta = chat.send_message(texto_recebido).text
-    if not resposta or not resposta.strip():
-        raise RuntimeError('O Gemini retornou uma resposta vazia.')
-    return resposta.strip()
-
-
+# --- WEBHOOK WHATSAPP: RECEBE E ENFILEIRA ---
 @bp.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
-    dados = request.get_json(silent=True) or {}
-    remote_jid = dados.get('data', {}).get('key', {}).get('remoteJid', '')
-    if '@g.us' in remote_jid:
-        print("Webhook ignorado: mensagem de grupo.")
-        return jsonify({"status": "ignorado", "motivo": "Mensagem de grupo"}), 200
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"erro": "Payload JSON inválido."}), 400
 
-    nome_instancia = dados.get('instance') if dados else None
-    empresa = Empresa.query.filter_by(instancia_whatsapp=nome_instancia).first()
-    if not empresa:
-        return jsonify({"erro": "Instância ou empresa não encontrada"}), 404
-    if not empresa.is_ativa:
-        return jsonify({"erro": "Conta suspensa. Contacte o suporte."}), 403
-    if dados.get('event') not in ['MESSAGES_UPSERT', 'messages.upsert']: return jsonify({"status": "ignorado"}), 200
-        
     try:
-        data_payload = dados.get('data', {})
-        msg_data = data_payload.get('message', {})
-        if data_payload.get('key', {}).get('fromMe', False): return jsonify({"status": "ignorado"}), 200
-
-        telefone_remetente = data_payload.get('key', {}).get('remoteJid', '').split('@')[0]
-        nome_contato = data_payload.get('pushName', 'Novo Contato')
-        
-        is_media = False
-        media_type = 'text'
-        if 'imageMessage' in msg_data: is_media = True; media_type = 'image'
-        elif 'audioMessage' in msg_data: is_media = True; media_type = 'audio'
-        elif 'documentMessage' in msg_data: is_media = True; media_type = 'document'
-        
-        texto_recebido = msg_data.get('conversation') or msg_data.get('extendedTextMessage', {}).get('text', '')
-        caption = msg_data.get('imageMessage', {}).get('caption', '') or msg_data.get('documentMessage', {}).get('caption', '')
-        if caption: texto_recebido = caption
-        if is_media and not texto_recebido: texto_recebido = "[Ficheiro Multimédia]"
-
-        if telefone_remetente and (texto_recebido or is_media):
-            pessoa = Pessoa.query.filter_by(empresa_id=empresa.id, telefone=telefone_remetente).first()
-            if not pessoa:
-                pessoa = Pessoa(
-                    empresa_id=empresa.id,
-                    nome=nome_contato,
-                    telefone=telefone_remetente,
-                    status_atendimento='menu' if empresa.usar_menu_inicial else 'ia',
-                    ia_ativa=True,
-                )
-                db.session.add(pessoa)
-                db.session.commit()
-                primeira_etapa = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).first()
-                if not primeira_etapa:
-                    return jsonify({"erro": "A empresa não possui etapas configuradas"}), 500
-                db.session.add(Negocio(empresa_id=empresa.id, titulo=f"Op. - {telefone_remetente}", pessoa_id=pessoa.id, etapa_id=primeira_etapa.id, user_id=None))
-                db.session.commit()
-
-            msg_db = texto_recebido
-            if is_media:
-                try:
-                    res_media = requests.post(f"{current_app.config['EVOLUTION_API_URL']}/chat/getBase64FromMediaMessage/{nome_instancia}", headers=evolution_headers(), json={"message": data_payload})
-                    if res_media.status_code in [200, 201]:
-                        b64 = res_media.json().get('base64')
-                        if b64 and not b64.startswith('data:'):
-                            mime = "image/jpeg" if media_type == 'image' else "audio/ogg" if media_type == 'audio' else "application/pdf"
-                            b64 = f"data:{mime};base64,{b64}"
-                        msg_db = json.dumps({"type": media_type, "content": b64, "caption": texto_recebido})
-                except: pass
-
-            db.session.add(Mensagem(empresa_id=empresa.id, pessoa_id=pessoa.id, mensagem=msg_db, tipo='inbound', data_envio=datetime.now()))
-            db.session.commit()
-
-            # O estado humano é terminal para o bot: registre a entrada e não responda.
-            if pessoa.status_atendimento == 'humano':
-                return jsonify({"status": "processado", "atendimento": "humano"}), 200
-
-            if pessoa.status_atendimento == 'menu':
-                texto_opcao = (texto_recebido or '').strip()
-                etapa = None
-                if texto_opcao.isdecimal():
-                    etapa = Etapa.query.filter_by(
-                        empresa_id=empresa.id,
-                        exibir_no_menu=True,
-                        numero_menu=int(texto_opcao),
-                    ).first()
-                if etapa:
-                    negocio = Negocio.query.filter_by(
-                        empresa_id=empresa.id, pessoa_id=pessoa.id
-                    ).order_by(Negocio.id).first()
-                    if negocio:
-                        negocio.etapa_id = etapa.id
-                    pessoa.status_atendimento = 'humano'
-                    pessoa.ia_ativa = False
-                    db.session.commit()
-                    enviar_resposta_webhook(
-                        empresa.id, pessoa.id, telefone_remetente,
-                        nome_instancia, empresa.mensagem_transbordo,
-                    )
-                    return jsonify({"status": "processado", "atendimento": "humano"}), 200
-                else:
-                    enviar_resposta_webhook(
-                        empresa.id, pessoa.id, telefone_remetente,
-                        nome_instancia, montar_texto_menu(empresa),
-                    )
-                return jsonify({"status": "processado", "atendimento": "menu"}), 200
-
-            if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
-                return jsonify({"status": "processado", "atendimento": pessoa.status_atendimento}), 200
-
-            try:
-                requests.post(
-                    f"{current_app.config['EVOLUTION_API_URL'].rstrip('/')}/chat/sendPresence/{nome_instancia}",
-                    headers=evolution_headers(),
-                    json={"number": telefone_remetente, "presence": "composing", "delay": 2000},
-                    timeout=10,
-                ).raise_for_status()
-            except requests.RequestException as erro:
-                current_app.logger.warning('Não foi possível enviar presença de digitação: %s', erro)
-
-            try:
-                resposta_bot = gerar_resposta_ia(empresa, pessoa, texto_recebido)
-            except Exception:
-                current_app.logger.exception(
-                    'Falha na IA para pessoa %s da empresa %s', pessoa.id, empresa.id
-                )
-                pessoa.status_atendimento = 'humano'
-                pessoa.ia_ativa = False
-                db.session.commit()
-                enviar_resposta_webhook(
-                    empresa.id, pessoa.id, telefone_remetente,
-                    nome_instancia, empresa.mensagem_transbordo,
-                )
-                return jsonify({"status": "processado", "atendimento": "humano"}), 200
-
-            if '[TRANSFERIR]' in resposta_bot:
-                pessoa.status_atendimento = 'humano'
-                pessoa.ia_ativa = False
-                db.session.commit()
-                enviar_resposta_webhook(
-                    empresa.id, pessoa.id, telefone_remetente,
-                    nome_instancia, empresa.mensagem_transbordo,
-                )
-                return jsonify({"status": "processado", "atendimento": "humano"}), 200
-
-            if resposta_bot:
-                enviar_resposta_webhook(
-                    empresa.id, pessoa.id, telefone_remetente,
-                    nome_instancia, resposta_bot,
-                )
-
-    except Exception as e: print(f"Erro Webhook: {e}")
-    return jsonify({"status": "processado"}), 200
+        processar_mensagem_whatsapp.delay(payload)
+    except Exception:
+        current_app.logger.exception('Não foi possível enfileirar mensagem WhatsApp.')
+        return jsonify({"status": "queue_unavailable"}), 503
+    return jsonify({"status": "queued"}), 200
 
 # --- ROTAS AUXILIARES E MÉTRICAS ---
 @bp.route('/api/check_updates')
