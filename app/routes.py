@@ -4,7 +4,6 @@ import re
 import secrets
 import unicodedata
 import math
-from dotenv import load_dotenv, find_dotenv
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import IntegrityError
@@ -28,7 +27,6 @@ from app.models import (
 from app.services.whatsapp import enviar_mensagem_whatsapp
 from app.tasks import processar_mensagem_whatsapp
 
-load_dotenv(find_dotenv(), override=True)
 bp = Blueprint('main', __name__)
 
 

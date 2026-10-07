@@ -7,7 +7,7 @@ services:
       - SERVER_URL=http://localhost:8080
       - AUTHENTICATION_API_KEY=sua_chave_secreta_aqui
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres:senha123@postgres:5432/evolution?schema=public
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-senha123}@postgres:5432/${POSTGRES_DB:-evolution}?schema=public
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://redis:6379/6
     depends_on:
@@ -17,9 +17,9 @@ services:
   postgres:
     image: postgres:15
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=senha123
-      - POSTGRES_DB=evolution
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-senha123}
+      - POSTGRES_DB=${POSTGRES_DB:-evolution}
     ports:
       - "5432:5432"
 

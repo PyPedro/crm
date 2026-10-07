@@ -5,11 +5,15 @@ from dotenv import load_dotenv
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '.env'))
 
+database_url = os.environ.get('DATABASE_URL')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-padrao')
     
-    # A CORREÇÃO ESTÁ AQUI: Se não encontrar o .env, usa o SQLite local por padrão
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///crm.db')
+    SQLALCHEMY_DATABASE_URI = database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Adicionamos fallbacks também para a API para garantir que arranca sempre

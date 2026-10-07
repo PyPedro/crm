@@ -8,7 +8,7 @@ from sqlalchemy import inspect, text
 from dotenv import load_dotenv, find_dotenv
 
 # Carrega as variáveis do ficheiro .env
-load_dotenv(find_dotenv(), override=True)
+load_dotenv(find_dotenv())
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -32,7 +32,10 @@ celery.Task = FlaskContextTask
 def create_app(config_overrides=None):
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'uma-chave-secreta-muito-segura-123')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///crm.db')
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     
     # Injeta as chaves do WhatsApp no ambiente global do Flask
     app.config['EVOLUTION_API_URL'] = os.environ.get('EVOLUTION_API_URL', 'http://195.201.237.138:8080')
