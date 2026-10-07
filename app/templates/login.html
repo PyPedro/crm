@@ -44,31 +44,28 @@
             </div>
             
             <div class="relative mt-14">
-                <!-- Carrossel Infinito de Logos -->
+                <!-- Carrossel Infinito de Logos (Aumentados) -->
                 {% if empresas %}
-                <div class="mb-8 w-full overflow-hidden">
-                    <p class="text-[10px] font-bold text-[#bce9d8] uppercase tracking-widest mb-4 opacity-70">
+                <div class="w-full overflow-hidden">
+                    <p class="text-[10px] font-bold text-[#bce9d8] uppercase tracking-widest mb-6 opacity-70">
                         Empresas que confiam na Optmiza
                     </p>
                     <!-- Máscara de esbatimento nas bordas para efeito suave -->
                     <div class="relative w-full overflow-hidden" style="mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);">
-                        <div class="animate-marquee flex items-center gap-10">
+                        <div class="animate-marquee flex items-center gap-12">
                             <!-- Loop Original -->
                             {% for empresa in empresas %}
-                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-7 w-auto max-w-[100px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
+                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-10 w-auto max-w-[140px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
                             {% endfor %}
                             
                             <!-- Loop Clone (necessário para não haver "quebra" no loop infinito) -->
                             {% for empresa in empresas %}
-                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-7 w-auto max-w-[100px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
+                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-10 w-auto max-w-[140px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
                             {% endfor %}
                         </div>
                     </div>
                 </div>
                 {% endif %}
-
-                <!-- Assinatura -->
-                <p class="text-xs text-white/55">Optmiza CRM · Gestão comercial B2B</p>
             </div>
         </section>
 
@@ -113,6 +110,9 @@
                 
                 <p class="mt-7 text-center text-sm text-slate-400">Ainda não tem uma empresa? <a class="font-semibold text-[#d3f36b] hover:underline" href="{{ url_for('main.register') }}">Criar conta</a></p>
 
+                <!-- Assinatura -->
+                <p class="mt-10 text-center text-xs text-white/30">Optmiza CRM · Gestão comercial B2B</p>
+                
             </div>
         </section>
     </main>
