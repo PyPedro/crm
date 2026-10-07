@@ -41,7 +41,8 @@ def bloquear_empresa_suspensa():
     }:
         return None
 
-    if not current_user.empresa.is_ativa:
+    # Segurança adicionada: Verifica se a empresa existe antes de checar se está ativa
+    if current_user.empresa and not current_user.empresa.is_ativa:
         logout_user()
         return 'Conta suspensa. Contacte o suporte.', 403
 
@@ -186,7 +187,8 @@ def login():
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
-            if not user.empresa.is_ativa:
+            # Segurança adicionada: Verifica se a empresa existe antes
+            if user.empresa and not user.empresa.is_ativa:
                 flash('Conta pendente de aprovação do administrador', 'warning')
                 return redirect(url_for('main.login'))
             login_user(user)
@@ -221,15 +223,26 @@ def authorize_google():
     user = User.query.filter_by(email=email).first()
     if not user:
         user = User.query.filter_by(google_id=google_id).first()
+    
     if user:
         if user.google_id and user.google_id != google_id:
             return redirect(url_for('main.login', msg='Este e-mail está associado a outra conta Google.'))
+            
+        # Segurança adicionada: Se for conta legado sem empresa associada
+        if not user.empresa:
+            session['registro_google_email'] = email
+            session['registro_google_google_id'] = google_id
+            return redirect(url_for('main.completar_cadastro'))
+            
+        # Verifica aprovação do Gatekeeper
         if not user.empresa.is_ativa:
             flash('Conta pendente de aprovação do administrador', 'warning')
             return redirect(url_for('main.login'))
+            
         if not user.google_id:
             user.google_id = google_id
             db.session.commit()
+            
         login_user(user)
         return redirect(url_for('main.index'))
 
@@ -263,12 +276,15 @@ def completar_cadastro():
             erro='Informe o nome da empresa com até 120 caracteres.',
             nome_utilizador=nome_utilizador, nome_empresa=nome_empresa,
         ), 400
-    if User.query.filter_by(email=email).first():
+        
+    user_existente = User.query.filter_by(email=email).first()
+    if user_existente and user_existente.empresa_id is not None:
         session.pop('registro_google_email', None)
         session.pop('registro_google_google_id', None)
         flash('Esta conta já está registada. Faça login para continuar.', 'warning')
         return redirect(url_for('main.login'))
-    if User.query.filter_by(username=nome_utilizador).first():
+        
+    if User.query.filter_by(username=nome_utilizador).first() and not user_existente:
         return render_template(
             'completar_cadastro.html', email=email,
             erro='Este nome de utilizador já está em uso.',
@@ -296,14 +312,21 @@ def completar_cadastro():
     )
     db.session.add(empresa)
     db.session.flush()
-    db.session.add(User(
-        empresa_id=empresa.id,
-        username=nome_utilizador,
-        email=email,
-        google_id=google_id,
-        password_hash=generate_password_hash(secrets.token_urlsafe(32)),
-        is_admin=True,
-    ))
+    
+    if user_existente:
+        user_existente.empresa_id = empresa.id
+        user_existente.username = nome_utilizador
+        user_existente.google_id = google_id
+    else:
+        db.session.add(User(
+            empresa_id=empresa.id,
+            username=nome_utilizador,
+            email=email,
+            google_id=google_id,
+            password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+            is_admin=True,
+        ))
+        
     db.session.add_all([
         Etapa(empresa_id=empresa.id, nome=etapa)
         for etapa in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')
