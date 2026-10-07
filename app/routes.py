@@ -23,6 +23,7 @@ from app.models import (
     User,
     Configuracao,
     Etiqueta,
+    RespostaAutomatica,
     hora_atual_br,
 )
 from app.services.whatsapp import enviar_mensagem_whatsapp
@@ -618,6 +619,48 @@ def apagar_usuario(id):
         db.session.commit()
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Utilizador não encontrado"}), 404
+
+
+# --- ROTAS PARA RESPOSTAS AUTOMÁTICAS (GATILHOS) ---
+@bp.route('/api/regras', methods=['GET', 'POST'])
+@login_required
+def gerir_regras():
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
+
+    if request.method == 'POST':
+        dados = request.json
+        palavra = dados.get('palavra_chave', '').strip()
+        resposta = dados.get('resposta', '').strip()
+
+        if not palavra or not resposta:
+            return jsonify({"erro": "Preencha ambos os campos"}), 400
+
+        nova_regra = RespostaAutomatica(
+            empresa_id=current_user.empresa_id,
+            palavra_chave=palavra,
+            resposta=resposta
+        )
+        db.session.add(nova_regra)
+        db.session.commit()
+        return jsonify({"status": "sucesso", "id": nova_regra.id})
+
+    regras = RespostaAutomatica.query.filter_by(empresa_id=current_user.empresa_id).all()
+    return jsonify([{"id": r.id, "palavra_chave": r.palavra_chave, "resposta": r.resposta} for r in regras])
+
+
+@bp.route('/api/regras/<int:id>', methods=['DELETE'])
+@login_required
+def apagar_regra(id):
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
+
+    regra = RespostaAutomatica.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
+    if regra:
+        db.session.delete(regra)
+        db.session.commit()
+        return jsonify({"status": "sucesso"})
+    return jsonify({"erro": "Regra não encontrada"}), 404
 
 
 # --- CONFIGURAÇÕES E KANBAN ---
