@@ -17,6 +17,7 @@ from app.models import (
     Mensagem,
     Negocio,
     Pessoa,
+    RespostaAutomatica,
     hora_atual_br,
 )
 from app.services.ia_service import gerar_resposta_ia
@@ -308,7 +309,16 @@ def _processar_payload(payload):
     if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
         return 'ignored'
 
-    # --- FLUXO DE INTELIGÊNCIA ARTIFICIAL ---
+    # --- 1. NOVA CAMADA DE GATILHOS ESTÁTICOS ---
+    texto_limpo = (texto_recebido or '').lower()
+    regras_automaticas = RespostaAutomatica.query.filter_by(empresa_id=empresa.id).all()
+    
+    for regra in regras_automaticas:
+        if regra.palavra_chave.lower() in texto_limpo:
+            _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, regra.resposta)
+            return 'replied_by_rule'
+
+    # --- 2. FLUXO DE INTELIGÊNCIA ARTIFICIAL ---
     try:
         requests.post(
             f"{current_app.config['EVOLUTION_API_URL'].rstrip('/')}/chat/sendPresence/{instancia}",
