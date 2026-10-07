@@ -89,6 +89,15 @@ class Pessoa(db.Model):
     mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
     etiquetas = db.relationship('Etiqueta', secondary=pessoa_etiqueta, backref=db.backref('pessoas', lazy=True))
 
+    # Propriedade virtual para o Frontend (Kanban) contar as mensagens não lidas
+    @property
+    def qtd_nao_lidas(self):
+        return Mensagem.query.filter_by(
+            pessoa_id=self.id, 
+            tipo='inbound', 
+            lida=False
+        ).count()
+
 
 class Negocio(db.Model):
     id = db.Column(db.Integer, primary_key=True)
