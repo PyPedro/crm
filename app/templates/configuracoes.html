@@ -30,7 +30,7 @@
         <div class="mb-6">
             <p class="mb-1 text-xs font-bold uppercase text-emerald-800">WhatsApp</p>
             <h1 class="text-2xl font-bold text-slate-900">Configurações do atendimento</h1>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Escolha como sua assistente conversa e veja uma prévia das mensagens antes de salvar.</p>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Escolha como sua assistente conversa, defina regras rápidas e veja uma prévia antes de salvar.</p>
         </div>
 
         {% if erro %}
@@ -47,6 +47,8 @@
         <form id="config-form" method="POST">
             <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
                 <div class="space-y-5">
+                    
+                    <!-- TOM DE RESPOSTA -->
                     <section class="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
                         <h2 class="text-base font-bold text-slate-900">Como a assistente deve conversar?</h2>
                         <p class="mt-1 text-sm text-slate-500">Escolha o estilo que combina com seus clientes.</p>
@@ -74,154 +76,3 @@
                                 </span>
                             </label>
                         </fieldset>
-                    </section>
-
-                    <section class="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-                        <h2 class="text-base font-bold text-slate-900">Mensagens para seus clientes</h2>
-                        <label for="mensagem-saudacao" class="mt-4 block text-sm font-semibold text-slate-700">Primeira mensagem</label>
-                        <p class="mt-1 text-xs leading-5 text-slate-500">É o primeiro contato da assistente com uma nova conversa.</p>
-                        <textarea id="mensagem-saudacao" name="mensagem_saudacao" data-variable-target maxlength="2000" rows="3" required class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">{{ form_values.mensagem_saudacao if form_values is defined else empresa.mensagem_saudacao }}</textarea>
-
-                        <label for="mensagem-transbordo" class="mt-5 block text-sm font-semibold text-slate-700">Quando precisar chamar alguém da equipe</label>
-                        <p class="mt-1 text-xs leading-5 text-slate-500">Esta mensagem será enviada se a assistente não conseguir responder ou transferir o atendimento.</p>
-                        <textarea id="mensagem-transbordo" name="mensagem_transbordo" data-variable-target maxlength="500" rows="3" required class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">{{ form_values.mensagem_transbordo if form_values is defined else empresa.mensagem_transbordo }}</textarea>
-
-                        <label for="prompt-personalidade" class="mt-5 block text-sm font-semibold text-slate-700">Informações úteis sobre seu negócio <span class="font-normal text-slate-400">(opcional)</span></label>
-                        <p class="mt-1 text-xs leading-5 text-slate-500">Escreva como explicaria seu negócio para uma pessoa nova na equipe.</p>
-                        <textarea id="prompt-personalidade" name="prompt_personalidade" maxlength="10000" rows="3" class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100" placeholder="Ex.: Atendemos de segunda a sexta, das 9h às 18h. Para indicar um produto, pergunte a quantidade desejada.">{{ form_values.prompt_personalidade if form_values is defined else empresa.prompt_personalidade }}</textarea>
-
-                        <div class="mt-4 flex flex-wrap items-center gap-2" aria-label="Variáveis para inserir na mensagem">
-                            <span class="mr-1 text-xs font-semibold text-slate-500">Personalizar mensagem:</span>
-                            <button type="button" data-variable="{nome_cliente}" class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-700 hover:bg-emerald-50">+ Nome do cliente</button>
-                            <button type="button" data-variable="{nome_empresa}" class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-700 hover:bg-emerald-50">+ Nome da empresa</button>
-                        </div>
-                    </section>
-
-                    <section class="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-                        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                            <div>
-                                <h2 class="text-base font-bold text-slate-900">Menu inicial</h2>
-                                <p class="mt-1 text-sm text-slate-500">Novos contatos podem escolher uma etapa antes de falar com a assistente.</p>
-                            </div>
-                            <label class="inline-flex cursor-pointer items-center gap-3">
-                                <input type="checkbox" name="usar_menu_inicial" value="on" {% if form_ativar|default(empresa.usar_menu_inicial) %}checked{% endif %} class="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
-                                <span class="text-sm font-semibold text-slate-700">Ativado</span>
-                            </label>
-                        </div>
-                        <label for="mensagem-saudacao" class="sr-only">Mensagem de saudação</label>
-                        <p class="mt-4 text-sm font-semibold text-slate-700">Etapas disponíveis no menu</p>
-                        <p class="mt-1 text-xs leading-5 text-slate-500">Marque as opções e escolha um número de 1 a 9.</p>
-                        <div class="mt-3 space-y-2">
-                            {% for etapa in etapas %}
-                            {% set numero_etapa = form_values.etapas_menu.get(etapa.id) if form_values is defined else etapa.numero_menu %}
-                            {% set etapa_marcada = (etapa.id|string) in request.form.getlist('etapa_exibir_no_menu') if form_values is defined else etapa.exibir_no_menu %}
-                            <div class="grid grid-cols-[minmax(0,1fr)_92px] items-center gap-4 rounded-lg border border-slate-200 p-3">
-                                <label class="flex min-w-0 items-center gap-3 text-sm font-medium text-slate-700">
-                                    <input type="checkbox" name="etapa_exibir_no_menu" value="{{ etapa.id }}" {% if etapa_marcada %}checked{% endif %} class="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
-                                    <span class="truncate">{{ etapa.nome }}</span>
-                                </label>
-                                <label class="text-xs font-semibold text-slate-600">Número
-                                    <input type="number" name="etapa_numero_{{ etapa.id }}" min="1" max="9" value="{{ numero_etapa if numero_etapa is not none else '' }}" class="mt-1 block w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-700">
-                                </label>
-                            </div>
-                            {% else %}
-                            <p class="rounded-lg border border-slate-200 px-3 py-4 text-sm text-slate-500">Cadastre etapas no Kanban antes de configurar o menu.</p>
-                            {% endfor %}
-                        </div>
-                    </section>
-                </div>
-
-                <aside class="lg:sticky lg:top-6">
-                    <section class="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-                        <div class="mb-4">
-                            <h2 class="text-base font-bold text-slate-900">Prévia da conversa</h2>
-                            <p id="preview-tone" class="mt-1 text-xs text-slate-500"></p>
-                        </div>
-                        <div class="mx-auto max-w-sm overflow-hidden rounded-[24px] border-[5px] border-slate-800 bg-white shadow-lg">
-                            <div class="flex items-center gap-3 bg-[#075e54] px-4 py-3 text-white">
-                                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-bold">{{ empresa.nome[:1]|upper }}</div>
-                                <div class="min-w-0">
-                                    <p id="preview-company-name" class="truncate text-sm font-semibold">{{ empresa.nome }}</p>
-                                    <p class="text-[11px] text-emerald-100">conta comercial</p>
-                                </div>
-                                <span class="ml-auto text-xs text-emerald-100">WhatsApp</span>
-                            </div>
-                            <div class="chat-wallpaper min-h-[370px] space-y-3 p-3 sm:min-h-[420px] sm:p-4">
-                                <div class="mx-auto w-fit rounded-md bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase text-slate-500">Hoje</div>
-                                <div class="max-w-[88%] rounded-lg rounded-tl-sm bg-white px-3 py-2 text-xs leading-5 text-slate-700 shadow-sm">
-                                    Olá! Gostaria de saber mais.
-                                    <span class="mt-1 block text-right text-[10px] text-slate-400">10:24</span>
-                                </div>
-                                <div class="ml-auto max-w-[92%] rounded-lg rounded-tr-sm bg-[#d9fdd3] px-3 py-2 text-xs leading-5 text-slate-800 shadow-sm">
-                                    <span class="mb-1 block text-[9px] font-bold uppercase tracking-normal text-emerald-800">Primeira mensagem</span>
-                                    <p id="preview-greeting" class="whitespace-pre-wrap break-words"></p>
-                                    <span class="mt-1 block text-right text-[10px] text-slate-500">10:24 <span aria-label="Enviada">✓✓</span></span>
-                                </div>
-                                <div class="ml-auto max-w-[92%] rounded-lg rounded-tr-sm bg-[#d9fdd3] px-3 py-2 text-xs leading-5 text-slate-800 shadow-sm">
-                                    <span class="mb-1 block text-[9px] font-bold uppercase tracking-normal text-emerald-800">Se precisar de atendimento</span>
-                                    <p id="preview-fallback" class="whitespace-pre-wrap break-words"></p>
-                                    <span class="mt-1 block text-right text-[10px] text-slate-500">10:25 <span aria-label="Enviada">✓✓</span></span>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="mt-3 text-center text-xs leading-5 text-slate-500">Os nomes de exemplo aparecem preenchidos na prévia.</p>
-                    </section>
-                </aside>
-            </div>
-
-            <div class="mt-6 flex justify-end border-t border-slate-200 pt-5">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-[#16382e] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245642] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 4 4L19 6"/></svg>
-                    Salvar configurações
-                </button>
-            </div>
-        </form>
-    </main>
-
-    <script>
-        (() => {
-            const form = document.getElementById('config-form');
-            const greetingField = document.getElementById('mensagem-saudacao');
-            const greetingPreview = document.getElementById('preview-greeting');
-            const fallbackPreview = document.getElementById('preview-fallback');
-            const tonePreview = document.getElementById('preview-tone');
-            const companyName = document.getElementById('preview-company-name').textContent.trim();
-            let activeField = greetingField;
-
-            function previewText(value) {
-                return value
-                    .replace(/\{nome_cliente\}/gi, 'João')
-                    .replace(/\{nome_empresa\}/gi, companyName);
-            }
-
-            function updatePreview() {
-                greetingPreview.textContent = previewText(greetingField.value) || 'Sua primeira mensagem aparecerá aqui.';
-                fallbackPreview.textContent = previewText(document.getElementById('mensagem-transbordo').value) || 'Sua mensagem de transferência aparecerá aqui.';
-                const selectedTone = form.querySelector('input[name="tom_resposta"]:checked');
-                tonePreview.textContent = selectedTone ? `Tom escolhido: ${selectedTone.dataset.toneLabel}.` : '';
-            }
-
-            form.querySelectorAll('[data-variable-target]').forEach((field) => {
-                field.addEventListener('focus', () => { activeField = field; });
-            });
-
-            form.addEventListener('input', updatePreview);
-            form.addEventListener('change', updatePreview);
-
-            form.querySelectorAll('[data-variable]').forEach((button) => {
-                button.addEventListener('click', () => {
-                    const variable = button.dataset.variable;
-                    const field = activeField || greetingField;
-                    const start = field.selectionStart;
-                    const end = field.selectionEnd;
-                    field.setRangeText(variable, start, end, 'end');
-                    field.focus();
-                    field.dispatchEvent(new Event('input', { bubbles: true }));
-                });
-            });
-
-            updatePreview();
-        })();
-    </script>
-</body>
-</html>
