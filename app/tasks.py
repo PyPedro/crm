@@ -185,5 +185,4 @@ def _processar_payload(payload):
                 'Empresa %s sem etapas configuradas.', empresa.id
             )
             return 'no_stage'
-        pessoa = Pessoa(
-            empresa_id=
+        pessoa =
