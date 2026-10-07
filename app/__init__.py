@@ -123,6 +123,14 @@ def create_app(config_overrides=None):
         if db.engine.dialect.name == 'postgresql':
             with db.engine.begin() as connection:
                 connection.execute(text(
+                    'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS '
+                    '"is_super_admin" BOOLEAN NOT NULL DEFAULT FALSE'
+                ))
+                connection.execute(text(
+                    'ALTER TABLE "empresa" ADD COLUMN IF NOT EXISTS '
+                    '"is_ativa" BOOLEAN NOT NULL DEFAULT FALSE'
+                ))
+                connection.execute(text(
                     'ALTER TABLE "empresa" ALTER COLUMN "is_ativa" SET DEFAULT FALSE'
                 ))
                 connection.execute(text(
