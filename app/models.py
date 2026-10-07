@@ -1,9 +1,9 @@
 from datetime import datetime
 import pytz
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 
-db = SQLAlchemy()
+# IMPORTANTE: Importa a instância do banco de dados já inicializada pela sua aplicação
+from app import db
 
 # Fuso horário padrão do sistema
 FUSO_HORARIO_BR = pytz.timezone('America/Sao_Paulo')
@@ -32,7 +32,7 @@ class Empresa(db.Model):
     tom_resposta = db.Column(db.String(20), nullable=True)
     mensagem_transbordo = db.Column(db.Text, nullable=True)
     
-    # Nova coluna para o logótipo em Base64
+    # Coluna para o logótipo em Base64
     logo_b64 = db.Column(db.Text, nullable=True)
 
     # Relacionamentos
