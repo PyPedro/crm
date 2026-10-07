@@ -89,3 +89,33 @@
                                             Salvar Imagem
                                         </button>
                                     </form>
+                                </div>
+                            </td>
+                            <td class="p-5 text-right">
+                                <!-- Botão de Bloqueio/Desbloqueio -->
+                                <form action="{{ url_for('main.toggle_empresa', id=empresa.id) }}" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    {% if empresa.is_ativa %}
+                                        <button type="submit" class="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 px-4 py-2 rounded-lg transition-colors">
+                                            Suspender
+                                        </button>
+                                    {% else %}
+                                        <button type="submit" class="text-xs font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 border border-green-100 px-4 py-2 rounded-lg transition-colors">
+                                            Ativar
+                                        </button>
+                                    {% endif %}
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="p-12 text-center text-slate-500 text-sm font-medium">Nenhuma empresa registada no sistema até ao momento.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
