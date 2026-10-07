@@ -185,4 +185,184 @@ def _processar_payload(payload):
                 'Empresa %s sem etapas configuradas.', empresa.id
             )
             return 'no_stage'
-        pessoa =
+        pessoa = Pessoa(
+            empresa_id=empresa.id,
+            nome=data_payload.get('pushName', 'Novo Contato'),
+            telefone=telefone,
+            status_atendimento='menu' if empresa.usar_menu_inicial else 'ia',
+            ia_ativa=True,
+        )
+        db.session.add(pessoa)
+        db.session.flush()
+        db.session.add(Negocio(
+            empresa_id=empresa.id,
+            titulo=f'Op. - {telefone}',
+            pessoa_id=pessoa.id,
+            etapa_id=primeira_etapa.id,
+            user_id=None,
+        ))
+        db.session.commit()
+    elif pessoa.status_atendimento == 'fechado':
+        pessoa.status_atendimento = 'menu' if empresa.usar_menu_inicial else 'ia'
+        pessoa.ia_ativa = True
+        atendimento_reaberto = True
+        db.session.commit()
+
+    mensagem_db = texto_recebido
+    if media_type:
+        try:
+            resposta_media = requests.post(
+                f"{current_app.config['EVOLUTION_API_URL'].rstrip('/')}/chat/getBase64FromMediaMessage/{instancia}",
+                headers={'apikey': current_app.config['EVOLUTION_API_KEY']},
+                json={'message': data_payload},
+                timeout=20,
+            )
+            resposta_media.raise_for_status()
+            base64_media = resposta_media.json().get('base64')
+            if base64_media and not base64_media.startswith('data:'):
+                mime = {
+                    'image': 'image/jpeg',
+                    'audio': 'audio/ogg',
+                    'document': 'application/pdf',
+                }[media_type]
+                base64_media = f'data:{mime};base64,{base64_media}'
+            if base64_media:
+                mensagem_db = json.dumps({
+                    'type': media_type,
+                    'content': base64_media,
+                    'caption': texto_recebido,
+                })
+        except (requests.RequestException, ValueError) as erro:
+            current_app.logger.warning('Falha ao obter mídia do WhatsApp: %s', erro)
+
+    db.session.add(Mensagem(
+        empresa_id=empresa.id,
+        pessoa_id=pessoa.id,
+        mensagem=mensagem_db,
+        tipo='inbound',
+        data_envio=data_mensagem,
+    ))
+    db.session.commit()
+
+    if atendimento_reaberto:
+        if empresa.usar_menu_inicial:
+            mensagem_reinicio = _montar_texto_menu(empresa, pessoa)
+            _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, mensagem_reinicio)
+            pessoa.status_atendimento = 'aguardando_menu'
+            db.session.commit()
+        else:
+            mensagem_reinicio = _personalizar_mensagem(
+                empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?',
+                empresa,
+                pessoa,
+            )
+            _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, mensagem_reinicio)
+        return 'reopened'
+
+    if pessoa.status_atendimento == 'humano':
+        return 'human'
+
+    # ESTADO 1: Acabou de entrar, enviamos o menu
+    if pessoa.status_atendimento == 'menu':
+        _enviar_resposta(
+            empresa.id, pessoa.id, telefone, instancia,
+            _montar_texto_menu(empresa, pessoa),
+        )
+        pessoa.status_atendimento = 'aguardando_menu'
+        db.session.commit()
+        return 'menu_sent'
+
+    # ESTADO 2: Já recebeu o menu, está a responder
+    if pessoa.status_atendimento == 'aguardando_menu':
+        etapa = None
+        texto_opcao = (texto_recebido or '').strip()
+        if texto_opcao.isdecimal():
+            etapa = Etapa.query.filter_by(
+                empresa_id=empresa.id,
+                exibir_no_menu=True,
+                numero_menu=int(texto_opcao),
+            ).first()
+            
+        if etapa:
+            negocio = Negocio.query.filter_by(
+                empresa_id=empresa.id, pessoa_id=pessoa.id
+            ).order_by(Negocio.id).first()
+            if negocio:
+                negocio.etapa_id = etapa.id
+            pessoa.status_atendimento = 'humano'
+            pessoa.ia_ativa = False
+            db.session.commit()
+            
+            _enviar_resposta(
+                empresa.id, pessoa.id, telefone, instancia,
+                empresa.mensagem_transbordo or "Entendido! Já vou te direcionar para a pessoa certa.",
+            )
+            return 'transferred_via_menu'
+        else:
+            # Se não digitou um número válido do menu, passa para humano silenciosamente
+            pessoa.status_atendimento = 'humano'
+            pessoa.ia_ativa = False
+            db.session.commit()
+            return 'human_fallback_menu'
+
+    if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
+        return 'ignored'
+
+    # --- FLUXO DE INTELIGÊNCIA ARTIFICIAL ---
+    try:
+        requests.post(
+            f"{current_app.config['EVOLUTION_API_URL'].rstrip('/')}/chat/sendPresence/{instancia}",
+            headers={'apikey': current_app.config['EVOLUTION_API_KEY']},
+            json={'number': telefone, 'presence': 'composing', 'delay': 2000},
+            timeout=10,
+        ).raise_for_status()
+    except requests.RequestException as erro:
+        current_app.logger.warning(
+            'Não foi possível enviar presença de digitação: %s', erro
+        )
+
+    tom_resposta = empresa.tom_resposta
+    prompt_personalidade = empresa.prompt_personalidade
+    historico, prompt_adicional = _preparar_contexto_ia(empresa, pessoa)
+    db.session.commit()
+    
+    # Gerar resposta com a IA
+    sucesso_ia, resposta_bot = gerar_resposta_ia(
+        tom_resposta,
+        prompt_personalidade,
+        texto_recebido,
+        historico,
+        prompt_adicional,
+    )
+    
+    # Fallback caso a API da IA falhe (erro de limite de tokens, timeout, etc)
+    if not sucesso_ia:
+        _transferir_para_humano(empresa, pessoa, telefone, instancia, erro_ia=True)
+        return 'transferred_ia_error'
+
+    # Fallback manual pedido pela própria IA no prompt
+    if '[TRANSFERIR]' in resposta_bot:
+        _transferir_para_humano(empresa, pessoa, telefone, instancia)
+        return 'transferred_ia_request'
+
+    _enviar_resposta(
+        empresa.id, pessoa.id, telefone, instancia, resposta_bot
+    )
+    return 'replied'
+
+
+@celery.task(name='app.tasks.processar_mensagem_whatsapp')
+def processar_mensagem_whatsapp(payload):
+    try:
+        return _processar_payload(payload)
+    except Exception:
+        db.session.rollback()
+        instancia = payload.get('instance') if isinstance(payload, dict) else None
+        logging.error(
+            'Falha ao processar mensagem WhatsApp da instância %s.',
+            instancia,
+            exc_info=True,
+        )
+        raise
+    finally:
+        db.session.remove()
