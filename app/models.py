@@ -43,6 +43,14 @@ class Empresa(db.Model):
     mensagens = db.relationship('Mensagem', backref='empresa', lazy=True)
     configuracao = db.relationship('Configuracao', backref='empresa', uselist=False, lazy=True)
     etiquetas = db.relationship('Etiqueta', backref='empresa', lazy=True)
+    respostas_automaticas = db.relationship('RespostaAutomatica', backref='empresa', lazy=True)
+
+
+class RespostaAutomatica(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    palavra_chave = db.Column(db.String(100), nullable=False)
+    resposta = db.Column(db.Text, nullable=False)
 
 
 class User(UserMixin, db.Model):
