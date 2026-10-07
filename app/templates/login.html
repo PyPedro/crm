@@ -26,7 +26,8 @@
         }
     </style>
 </head>
-<body class="min-h-screen bg-[#101b22] text-white flex items-center justify-center p-5">
+<body class="min-h-screen bg-[#101b22] text-white flex flex-col items-center justify-center p-5">
+    
     <main class="w-full max-w-5xl min-h-[620px] grid md:grid-cols-[1.05fr_0.95fr] overflow-hidden rounded-2xl border border-white/10 bg-[#17252d] shadow-2xl rise">
         
         <!-- Lado Esquerdo (Branding - Parte Verde) -->
@@ -55,12 +56,12 @@
                         <div class="animate-marquee flex items-center gap-12">
                             <!-- Loop Original -->
                             {% for empresa in empresas %}
-                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-10 w-auto max-w-[140px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
+                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-14 w-auto max-w-[180px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
                             {% endfor %}
                             
                             <!-- Loop Clone (necessário para não haver "quebra" no loop infinito) -->
                             {% for empresa in empresas %}
-                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-10 w-auto max-w-[140px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
+                                <img src="{{ empresa.logo_b64 }}" alt="{{ empresa.nome }}" class="h-14 w-auto max-w-[180px] object-contain grayscale brightness-200 opacity-60 hover:grayscale-0 hover:brightness-100 hover:opacity-100 transition-all duration-300">
                             {% endfor %}
                         </div>
                     </div>
@@ -109,12 +110,14 @@
                 </form>
                 
                 <p class="mt-7 text-center text-sm text-slate-400">Ainda não tem uma empresa? <a class="font-semibold text-[#d3f36b] hover:underline" href="{{ url_for('main.register') }}">Criar conta</a></p>
-
-                <!-- Assinatura -->
-                <p class="mt-10 text-center text-xs text-white/30">Optmiza CRM · Gestão comercial B2B</p>
-                
             </div>
         </section>
     </main>
+    
+    <!-- Assinatura Centralizada Abaixo do Card -->
+    <p class="mt-8 text-white/40 text-[11px] tracking-wide text-center rise" style="animation-delay: 0.2s;">
+        Desenvolvido por <strong class="text-white/70">Pedro Marinho</strong>. Um produto <strong class="text-[#d3f36b]/80">Optmiza</strong>.
+    </p>
+
 </body>
 </html>
