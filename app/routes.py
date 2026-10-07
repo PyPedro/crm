@@ -4,6 +4,7 @@ import re
 import secrets
 import unicodedata
 import math
+import base64
 from flask import Blueprint, request, jsonify, render_template, current_app, redirect, url_for, render_template_string, session, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import IntegrityError
@@ -36,7 +37,7 @@ def bloquear_empresa_suspensa():
         return None
 
     if current_user.is_super_admin and request.endpoint in {
-        'main.optmiza_master', 'main.toggle_empresa',
+        'main.optmiza_master', 'main.toggle_empresa', 'main.upload_logo_empresa',
         'main.admin_empresas_pendentes', 'main.admin_ativar_empresa',
     }:
         return None
@@ -193,9 +194,13 @@ def login():
                 return redirect(url_for('main.login'))
             login_user(user)
             return redirect(url_for('main.index'))
-        return render_template('login.html', erro="Credenciais inválidas")
+            
+        # Retorna para a página com erro, mas precisamos recarregar os logos
+        empresas_com_logo = Empresa.query.filter(Empresa.logo_b64.isnot(None)).all()
+        return render_template('login.html', erro="Credenciais inválidas", empresas=empresas_com_logo)
         
-    return render_template('login.html', msg=msg_sucesso)
+    empresas_com_logo = Empresa.query.filter(Empresa.logo_b64.isnot(None)).all()
+    return render_template('login.html', msg=msg_sucesso, empresas=empresas_com_logo)
 
 
 @bp.route('/login/google')
@@ -381,6 +386,26 @@ def toggle_empresa(id):
 
     empresa.is_ativa = not empresa.is_ativa
     db.session.commit()
+    return redirect(url_for('main.optmiza_master'))
+
+
+# --- UPLOAD DE LOGOTIPO DA EMPRESA ---
+@bp.route('/optmiza-master/empresa/<int:id>/logo', methods=['POST'])
+@login_required
+def upload_logo_empresa(id):
+    if not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
+
+    empresa = db.session.get(Empresa, id)
+    if not empresa:
+        return 'Empresa não encontrada.', 404
+
+    file = request.files.get('logo')
+    if file and file.filename.lower().endswith('.png'):
+        encoded_string = base64.b64encode(file.read()).decode('utf-8')
+        empresa.logo_b64 = f"data:image/png;base64,{encoded_string}"
+        db.session.commit()
+    
     return redirect(url_for('main.optmiza_master'))
 
 
