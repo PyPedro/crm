@@ -17,7 +17,7 @@
                 <p class="text-slate-500 text-sm mt-1">Gestão global de empresas e contas B2B</p>
             </div>
             <div class="flex items-center gap-3">
-                <!-- Botão que abre o Modal -->
+                <!-- Botão que abre o Modal Nova Empresa -->
                 <button onclick="document.getElementById('modal-nova-empresa').classList.remove('hidden')" class="bg-blue-600 border border-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     Nova Empresa
@@ -51,7 +51,7 @@
                             <th class="p-5 font-bold">Empresa & Instância</th>
                             <th class="p-5 font-bold text-center">Usuários</th>
                             <th class="p-5 font-bold text-center">Status</th>
-                            <th class="p-5 font-bold">Logótipo (PNG)</th>
+                            <th class="p-5 font-bold text-center">Logótipo</th>
                             <th class="p-5 font-bold text-right">Ações</th>
                         </tr>
                     </thead>
@@ -75,29 +75,28 @@
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500">Inativa</span>
                                 {% endif %}
                             </td>
-                            <td class="p-5">
-                                <div class="flex items-center gap-4">
+                            
+                            <!-- COLUNA DO LOGÓTIPO LIMPA COM BOTÃO DE MODAL -->
+                            <td class="p-5 text-center">
+                                <div class="inline-flex items-center gap-3">
                                     {% if empresa.logo_b64 %}
-                                        <div class="h-12 w-12 flex-shrink-0 bg-white border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden shadow-sm p-1">
+                                        <div class="h-10 w-10 flex-shrink-0 bg-white border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden shadow-sm p-1">
                                             <img src="{{ empresa.logo_b64 }}" alt="Logo" class="h-full w-full object-contain">
                                         </div>
                                     {% else %}
-                                        <div class="h-12 w-12 flex-shrink-0 bg-slate-50 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-[10px] font-semibold">
+                                        <div class="h-10 w-10 flex-shrink-0 bg-slate-50 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-[9px] font-semibold">
                                             Vazio
                                         </div>
                                     {% endif %}
                                     
-                                    <form action="{{ url_for('main.upload_logo_empresa', id=empresa.id) }}" method="POST" enctype="multipart/form-data" class="flex flex-col gap-1.5">
-                                        <input type="file" name="logo" accept=".png" required 
-                                               class="w-48 text-[11px] text-slate-500 file:cursor-pointer file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-wider file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all cursor-pointer">
-                                        <button type="submit" class="self-start bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-md transition-colors shadow-sm">
-                                            Salvar Imagem
-                                        </button>
-                                    </form>
+                                    <button onclick="abrirModalLogo('{{ empresa.id }}', '{{ empresa.nome }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors border border-slate-200">
+                                        Alterar Logo
+                                    </button>
                                 </div>
                             </td>
+
                             <td class="p-5 text-right">
-                                <form action="{{ url_for('main.toggle_empresa', id=empresa.id) }}" method="POST">
+                                <form action="{{ url_for('main.toggle_empresa', id=empresa.id) }}" method="POST" class="inline">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     {% if empresa.is_ativa %}
                                         <button type="submit" class="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 px-4 py-2 rounded-lg transition-colors">
@@ -122,6 +121,29 @@
         </div>
     </div>
 
+    <!-- MODAL: Alterar Logótipo -->
+    <div id="modal-logo" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-800 text-sm" id="modal-logo-titulo">Atualizar Logótipo</h3>
+                <button onclick="fecharModalLogo()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+            </div>
+            
+            <form id="form-upload-logo" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Selecione o ficheiro PNG</label>
+                    <input type="file" name="logo" accept=".png" required class="w-full text-xs text-slate-500 file:cursor-pointer file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all border border-slate-200 rounded-xl p-2 bg-slate-50">
+                </div>
+                
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm">
+                        Salvar Logótipo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL: Nova Empresa -->
     <div id="modal-nova-empresa" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -131,7 +153,6 @@
             </div>
             
             <form action="{{ url_for('main.admin_nova_empresa') }}" method="POST" class="p-6 space-y-4">
-                <!-- Usamos o mesmo token gerado pela view master -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 
                 <div>
@@ -157,5 +178,22 @@
             </form>
         </div>
     </div>
+
+    <!-- SCRIPT DO MODAL DE LOGO -->
+    <script>
+        function abrirModalLogo(empresaId, nomeEmpresa) {
+            const modal = document.getElementById('modal-logo');
+            const form = document.getElementById('form-upload-logo');
+            const titulo = document.getElementById('modal-logo-titulo');
+            
+            titulo.textContent = `Logótipo: ${nomeEmpresa}`;
+            form.action = `/optmiza-master/empresa/${empresaId}/logo`;
+            modal.classList.remove('hidden');
+        }
+
+        function fecharModalLogo() {
+            document.getElementById('modal-logo').classList.add('hidden');
+        }
+    </script>
 </body>
 </html>
