@@ -32,7 +32,7 @@ class Empresa(db.Model):
     tom_resposta = db.Column(db.String(20), nullable=True)
     mensagem_transbordo = db.Column(db.Text, nullable=True)
     
-    # Coluna para o logótipo em Base64
+    # Mantido apenas para retrocompatibilidade, mas não mais usado no Master
     logo_b64 = db.Column(db.Text, nullable=True)
 
     # Relacionamentos
@@ -44,6 +44,13 @@ class Empresa(db.Model):
     configuracao = db.relationship('Configuracao', backref='empresa', uselist=False, lazy=True)
     etiquetas = db.relationship('Etiqueta', backref='empresa', lazy=True)
     respostas_automaticas = db.relationship('RespostaAutomatica', backref='empresa', lazy=True)
+
+
+class LogotipoGlobal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(120), nullable=False)
+    logo_b64 = db.Column(db.Text, nullable=False)
+    data_envio = db.Column(db.DateTime(timezone=True), default=hora_atual_br)
 
 
 class RespostaAutomatica(db.Model):
@@ -97,7 +104,6 @@ class Pessoa(db.Model):
     mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
     etiquetas = db.relationship('Etiqueta', secondary=pessoa_etiqueta, backref=db.backref('pessoas', lazy=True))
 
-    # Propriedade virtual para o Frontend (Kanban) contar as mensagens não lidas
     @property
     def qtd_nao_lidas(self):
         return Mensagem.query.filter_by(
@@ -124,7 +130,7 @@ class Mensagem(db.Model):
     pessoa_id = db.Column(db.Integer, db.ForeignKey('pessoa.id'), nullable=False)
     
     mensagem = db.Column(db.Text, nullable=False)
-    tipo = db.Column(db.String(20), nullable=False) # 'inbound' (recebida) ou 'outbound' (enviada)
+    tipo = db.Column(db.String(20), nullable=False)
     lida = db.Column(db.Boolean, default=False)
     data_envio = db.Column(db.DateTime(timezone=True), default=hora_atual_br)
 
