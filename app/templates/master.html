@@ -41,7 +41,49 @@
           {% endif %}
         {% endwith %}
 
-        <!-- Tabela de Empresas -->
+        <!-- SECÇÃO: BIBLIOTECA GLOBAL DE LOGÓTIPOS -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 relative overflow-hidden">
+            <div class="absolute right-0 top-0 opacity-5 pt-4 pr-4 pointer-events-none">
+                <svg class="w-32 h-32 text-slate-900" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z"/></svg>
+            </div>
+            
+            <div class="relative z-10">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">Biblioteca Global de Logótipos</h2>
+                        <p class="text-xs text-slate-500 mt-1">Faça upload de imagens PNG. Elas vão aparecer como clientes do Optmiza na página de login e ecrãs públicos.</p>
+                    </div>
+                    <button onclick="document.getElementById('modal-novo-logo').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap">
+                        + Enviar Logótipo
+                    </button>
+                </div>
+
+                <!-- Grelha de Logótipos -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                    {% for logo in logos %}
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center relative group transition-all hover:border-slate-300 hover:shadow-sm">
+                        <div class="h-14 w-14 bg-white border border-slate-100 rounded-lg flex items-center justify-center overflow-hidden shadow-sm p-1 mb-2">
+                            <img src="{{ logo.logo_b64 }}" alt="{{ logo.nome }}" class="h-full w-full object-contain">
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-600 truncate w-full text-center" title="{{ logo.nome }}">{{ logo.nome }}</span>
+                        
+                        <!-- Botão de Apagar ao passar o rato -->
+                        <form action="{{ url_for('main.admin_apagar_logo_global', id=logo.id) }}" method="POST" class="absolute -top-2 -right-2 hidden group-hover:block z-10">
+                            <button type="submit" onclick="return confirm('Deseja mesmo apagar este logótipo da biblioteca?')" class="bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="col-span-full py-8 text-center text-slate-400 text-sm font-medium border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                        Nenhum logótipo carregado. A biblioteca está vazia.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Empresas (Limpa) -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -51,7 +93,6 @@
                             <th class="p-5 font-bold">Empresa & Instância</th>
                             <th class="p-5 font-bold text-center">Usuários</th>
                             <th class="p-5 font-bold text-center">Status</th>
-                            <th class="p-5 font-bold text-center">Logótipo</th>
                             <th class="p-5 font-bold text-right">Ações</th>
                         </tr>
                     </thead>
@@ -61,7 +102,7 @@
                             <td class="p-5 text-sm font-bold text-slate-400">#{{ empresa.id }}</td>
                             <td class="p-5">
                                 <div class="text-sm font-bold text-slate-800">{{ empresa.nome }}</div>
-                                <div class="text-[11px] text-slate-400 font-medium mt-1 truncate max-w-[200px]" title="{{ empresa.instancia_whatsapp }}">
+                                <div class="text-[11px] text-slate-400 font-medium mt-1 truncate max-w-[250px]" title="{{ empresa.instancia_whatsapp }}">
                                     {{ empresa.instancia_whatsapp }}
                                 </div>
                             </td>
@@ -75,26 +116,6 @@
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500">Inativa</span>
                                 {% endif %}
                             </td>
-                            
-                            <!-- COLUNA DO LOGÓTIPO LIMPA COM BOTÃO DE MODAL -->
-                            <td class="p-5 text-center">
-                                <div class="inline-flex items-center gap-3">
-                                    {% if empresa.logo_b64 %}
-                                        <div class="h-10 w-10 flex-shrink-0 bg-white border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden shadow-sm p-1">
-                                            <img src="{{ empresa.logo_b64 }}" alt="Logo" class="h-full w-full object-contain">
-                                        </div>
-                                    {% else %}
-                                        <div class="h-10 w-10 flex-shrink-0 bg-slate-50 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-[9px] font-semibold">
-                                            Vazio
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <button onclick="abrirModalLogo('{{ empresa.id }}', '{{ empresa.nome }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors border border-slate-200">
-                                        Alterar Logo
-                                    </button>
-                                </div>
-                            </td>
-
                             <td class="p-5 text-right">
                                 <form action="{{ url_for('main.toggle_empresa', id=empresa.id) }}" method="POST" class="inline">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -112,7 +133,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="p-12 text-center text-slate-500 text-sm font-medium">Nenhuma empresa registada no sistema até ao momento.</td>
+                            <td colspan="5" class="p-12 text-center text-slate-500 text-sm font-medium">Nenhuma empresa registada no sistema até ao momento.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -121,23 +142,27 @@
         </div>
     </div>
 
-    <!-- MODAL: Alterar Logótipo -->
-    <div id="modal-logo" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <!-- MODAL: Enviar Novo Logótipo Global -->
+    <div id="modal-novo-logo" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 class="font-bold text-slate-800 text-sm" id="modal-logo-titulo">Atualizar Logótipo</h3>
-                <button onclick="fecharModalLogo()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+                <h3 class="font-bold text-slate-800 text-sm">Adicionar à Biblioteca</h3>
+                <button onclick="document.getElementById('modal-novo-logo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
             </div>
             
-            <form id="form-upload-logo" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+            <form action="{{ url_for('main.admin_upload_logo_global') }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Selecione o ficheiro PNG</label>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Nome da Marca</label>
+                    <input type="text" name="nome" placeholder="Ex: Arantz Suplementos" required class="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Ficheiro PNG</label>
                     <input type="file" name="logo" accept=".png" required class="w-full text-xs text-slate-500 file:cursor-pointer file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all border border-slate-200 rounded-xl p-2 bg-slate-50">
                 </div>
                 
                 <div class="pt-2">
                     <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm">
-                        Salvar Logótipo
+                        Enviar Logótipo
                     </button>
                 </div>
             </form>
@@ -178,22 +203,5 @@
             </form>
         </div>
     </div>
-
-    <!-- SCRIPT DO MODAL DE LOGO -->
-    <script>
-        function abrirModalLogo(empresaId, nomeEmpresa) {
-            const modal = document.getElementById('modal-logo');
-            const form = document.getElementById('form-upload-logo');
-            const titulo = document.getElementById('modal-logo-titulo');
-            
-            titulo.textContent = `Logótipo: ${nomeEmpresa}`;
-            form.action = `/optmiza-master/empresa/${empresaId}/logo`;
-            modal.classList.remove('hidden');
-        }
-
-        function fecharModalLogo() {
-            document.getElementById('modal-logo').classList.add('hidden');
-        }
-    </script>
 </body>
 </html>
