@@ -48,12 +48,14 @@
     }
   </style>
 </head>
-<body class="font-body text-noite antialiased flex flex-col justify-between min-h-screen">
-<main class="w-full flex-1 grid lg:grid-cols-2">
+<body class="font-body text-noite antialiased flex items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
 
-  <!-- COLUNA ESQUERDA: INSTITUCIONAL (Mais compacta no mobile, expandida no desktop) -->
-  <section class="relative overflow-hidden bg-noite text-white px-6 py-8 sm:px-10 lg:px-16 lg:py-14 flex flex-col justify-between gap-8 lg:gap-16">
-    <svg viewBox="0 0 60 60" class="absolute pointer-events-none opacity-[.13]" style="right:-30%;bottom:-30%;width:min(760px,130vw)" aria-hidden="true">
+<!-- CARTÃO CENTRALIZADO -->
+<main class="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden grid lg:grid-cols-2 border border-slate-200/80 dark:border-slate-800">
+
+  <!-- COLUNA ESQUERDA: INSTITUCIONAL -->
+  <section class="relative overflow-hidden bg-noite text-white px-6 py-8 sm:px-10 lg:px-12 lg:py-12 flex flex-col justify-between gap-8 lg:gap-12">
+    <svg viewBox="0 0 60 60" class="absolute pointer-events-none opacity-[.13]" style="right:-30%;bottom:-30%;width:min(600px,120vw)" aria-hidden="true">
       <circle class="draw" cx="30" cy="30" r="22.5" fill="none" stroke="#0EA5E9" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/>
     </svg>
 
@@ -67,24 +69,16 @@
 
     <div class="relative max-w-xl">
       <p class="text-claro font-medium text-xs sm:text-sm">Sua operação comercial, em fluxo.</p>
-      <h1 class="mt-3 sm:mt-4 font-display font-medium tracking-tight leading-[1.08] text-3xl sm:text-4xl lg:text-5xl">Vendas e conversas no mesmo ritmo.</h1>
-      <p class="mt-4 sm:mt-6 text-base sm:text-lg text-slate-300 leading-relaxed">Conecte o atendimento do WhatsApp ao seu funil de vendas e acompanhe cada oportunidade em um só lugar.</p>
-      <div class="mt-6 sm:mt-10 flex items-center text-xs sm:text-sm text-slate-300" aria-hidden="true">
-        <span>Conversa</span><i class="mx-2 sm:mx-3 h-px flex-1 bg-slate-600"></i>
-        <span>Oportunidade</span><i class="mx-2 sm:mx-3 h-px flex-1 bg-slate-600"></i>
-        <span>Venda</span><i class="mx-2 sm:mx-3 h-px w-4 sm:w-6 bg-slate-600"></i>
-        <svg viewBox="0 0 60 60" class="w-5 h-5 sm:w-6 sm:h-6 flex-none" aria-hidden="true">
-          <circle cx="30" cy="30" r="22.5" fill="none" stroke="#0EA5E9" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/>
-        </svg>
-      </div>
+      <h1 class="mt-3 sm:mt-4 font-display font-medium tracking-tight leading-[1.08] text-3xl sm:text-4xl">Vendas e conversas no mesmo ritmo.</h1>
+      <p class="mt-4 text-sm sm:text-base text-slate-300 leading-relaxed">Conecte o atendimento do WhatsApp ao seu funil de vendas e acompanhe cada oportunidade em um só lugar.</p>
     </div>
 
-    <!-- VITRINE DE PARCEIROS / RODAPÉ ESQUERDO -->
+    <!-- VITRINE DE PARCEIROS -->
     <div class="relative">
       {% if empresas %}
-      <div class="mb-4">
-        <p class="text-[11px] uppercase tracking-wider text-slate-400 mb-2.5 font-medium">Empresas em fluxo com a Optmiza</p>
-        <div class="flex flex-wrap items-center gap-2.5">
+      <div class="mb-3">
+        <p class="text-[11px] uppercase tracking-wider text-slate-400 mb-2 font-medium">Empresas em fluxo com a Optmiza</p>
+        <div class="flex flex-wrap items-center gap-2">
           {% for emp in empresas %}
           <div class="h-8 px-2 bg-white/95 rounded-md flex items-center justify-center shadow-sm" title="{{ emp.nome }}">
             <img src="{{ emp.logo_b64 }}" alt="{{ emp.nome }}" class="max-h-5 w-auto object-contain">
@@ -93,17 +87,17 @@
         </div>
       </div>
       {% endif %}
-      <p class="text-xs sm:text-sm text-slate-500">Optmiza CRM</p>
+      <p class="text-xs text-slate-500">Optmiza CRM</p>
     </div>
   </section>
 
-  <!-- COLUNA DIREITA: FORMULÁRIO DE LOGIN (Mobile First Otimizado) -->
-  <section class="flex flex-col items-center justify-center px-6 py-10 sm:py-14 dark:text-slate-100">
+  <!-- COLUNA DIREITA: FORMULÁRIO DE LOGIN -->
+  <section class="flex flex-col items-center justify-center px-6 py-10 sm:py-12 bg-white dark:bg-slate-900 dark:text-slate-100">
     <div class="w-full max-w-sm">
       <h2 class="font-display font-medium text-2xl sm:text-3xl tracking-tight">Entrar</h2>
-      <p class="mt-1.5 text-sm sm:text-base text-aco dark:text-slate-400">Acesse sua operação comercial.</p>
+      <p class="mt-1.5 text-sm text-aco dark:text-slate-400">Acesse sua operação comercial.</p>
 
-      <!-- ALERTAS E MENSAGENS DO FLASK -->
+      <!-- ALERTAS E MENSAGENS -->
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mt-5 space-y-2">
@@ -129,7 +123,7 @@
       {% endif %}
 
       <!-- BOTÃO GOOGLE OAUTH -->
-      <a href="{{ url_for('main.login_google') }}" class="mt-6 sm:mt-8 w-full h-12 rounded-lg border border-slate-300 bg-white text-noite font-medium flex items-center justify-center gap-3 hover:bg-slate-50 dark:bg-[#111A2E] dark:text-slate-100 dark:border-slate-700 dark:hover:bg-[#16213A] transition-colors shadow-sm">
+      <a href="{{ url_for('main.login_google') }}" class="mt-6 w-full h-12 rounded-lg border border-slate-300 bg-white text-noite font-medium flex items-center justify-center gap-3 hover:bg-slate-50 dark:bg-[#111A2E] dark:text-slate-100 dark:border-slate-700 dark:hover:bg-[#16213A] transition-colors shadow-sm text-sm">
         <svg viewBox="0 0 24 24" class="w-5 h-5 shrink-0" aria-hidden="true">
           <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z"/>
           <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.92l-3.88-3a7.2 7.2 0 0 1-10.7-3.78H1.34v3.09A12 12 0 0 0 12 24z"/>
@@ -139,42 +133,43 @@
         Entrar com Google
       </a>
 
-      <div class="my-5 sm:my-6 flex items-center gap-4 text-xs sm:text-sm text-aco dark:text-slate-400">
+      <div class="my-5 flex items-center gap-4 text-xs sm:text-sm text-aco dark:text-slate-400">
         <i class="h-px flex-1 bg-slate-300 dark:bg-slate-700"></i>ou entre com seu usuário<i class="h-px flex-1 bg-slate-300 dark:bg-slate-700"></i>
       </div>
 
-      <!-- FORMULÁRIO DE LOGIN -->
-      <form method="POST" action="{{ url_for('main.login') }}" class="space-y-4 sm:space-y-5">
+      <!-- FORMULÁRIO -->
+      <form method="POST" action="{{ url_for('main.login') }}" class="space-y-4">
         <label class="block text-sm font-medium">
           Usuário
-          <input name="username" required autocomplete="username" placeholder="Seu nome de usuário" class="mt-1.5 w-full h-12 rounded-lg border border-slate-300 bg-white px-4 text-noite placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-optmiza dark:bg-[#111A2E] dark:border-slate-700 dark:text-slate-100">
+          <input name="username" required autocomplete="username" placeholder="Seu nome de usuário" class="mt-1.5 w-full h-11 rounded-lg border border-slate-300 bg-white px-4 text-noite placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-optmiza dark:bg-[#111A2E] dark:border-slate-700 dark:text-slate-100 text-sm">
         </label>
         <div>
           <div class="flex items-center justify-between">
             <label for="senha" class="text-sm font-medium">Senha</label>
-            <a href="#" onclick="alert('Solicite um link de redefinição de senha ao administrador da sua empresa.'); return false;" class="text-xs sm:text-sm text-profundo dark:text-claro underline underline-offset-4">Esqueci a senha</a>
+            <a href="#" onclick="alert('Solicite um link de redefinição de senha ao administrador da sua empresa.'); return false;" class="text-xs text-profundo dark:text-claro underline underline-offset-4">Esqueci a senha</a>
           </div>
           <div class="relative">
-            <input id="senha" type="password" name="password" required autocomplete="current-password" placeholder="Sua senha" class="mt-1.5 w-full h-12 rounded-lg border border-slate-300 bg-white px-4 text-noite placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-optmiza dark:bg-[#111A2E] dark:border-slate-700 dark:text-slate-100 pr-20">
-            <button type="button" id="ver" class="absolute right-3 top-1/2 mt-[3px] -translate-y-1/2 text-xs sm:text-sm font-medium text-aco dark:text-slate-400 px-2 py-1" aria-controls="senha">Mostrar</button>
+            <input id="senha" type="password" name="password" required autocomplete="current-password" placeholder="Sua senha" class="mt-1.5 w-full h-11 rounded-lg border border-slate-300 bg-white px-4 text-noite placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-optmiza dark:bg-[#111A2E] dark:border-slate-700 dark:text-slate-100 pr-20 text-sm">
+            <button type="button" id="ver" class="absolute right-3 top-1/2 mt-[3px] -translate-y-1/2 text-xs font-medium text-aco dark:text-slate-400 px-2 py-1" aria-controls="senha">Mostrar</button>
           </div>
         </div>
-        <button type="submit" class="w-full h-12 rounded-lg bg-profundo text-white font-medium hover:bg-noite dark:bg-optmiza dark:text-noite dark:hover:bg-claro transition-colors shadow-sm">
+        <button type="submit" class="w-full h-11 rounded-lg bg-profundo text-white font-medium hover:bg-noite dark:bg-optmiza dark:text-noite dark:hover:bg-claro transition-colors shadow-sm text-sm">
           Entrar
         </button>
       </form>
 
-      <p class="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-aco dark:text-slate-400">
+      <p class="mt-6 text-center text-xs sm:text-sm text-aco dark:text-slate-400">
         Ainda não tem uma empresa? <a href="{{ url_for('main.register') }}" class="font-medium text-profundo dark:text-claro underline underline-offset-4">Criar conta</a>
       </p>
     </div>
 
-    <p class="mt-10 sm:mt-14 text-xs text-aco dark:text-slate-500 text-center">
+    <p class="mt-8 text-xs text-aco dark:text-slate-500 text-center">
       Desenvolvido por <strong class="font-medium">Pedro Marinho</strong>. Um produto <strong class="font-medium text-profundo dark:text-claro">Optmiza</strong>.
     </p>
   </section>
 
 </main>
+
 <script>
   document.getElementById('ver').addEventListener('click', function() {
     var i = document.getElementById('senha'), s = i.type === 'password';
