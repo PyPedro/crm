@@ -25,18 +25,18 @@ class Empresa(db.Model):
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     is_ativa = db.Column(db.Boolean, default=False)
     
-    # CORREÇÃO: Coluna adicionada para evitar erro de NullViolation no banco de dados
+    # Data de criação (Evita NotNullViolation)
     data_criacao = db.Column(db.DateTime(timezone=True), default=hora_atual_br, nullable=False)
     
-    # Configurações do Bot de Atendimento
+    # Configurações do Bot de Atendimento com valores padrão (Evita NotNullViolation)
     usar_menu_inicial = db.Column(db.Boolean, default=False)
-    mensagem_saudacao = db.Column(db.Text, nullable=True)
-    prompt_personalidade = db.Column(db.Text, nullable=True)
-    tom_resposta = db.Column(db.String(20), nullable=True)
-    mensagem_transbordo = db.Column(db.Text, nullable=True)
+    mensagem_saudacao = db.Column(db.Text, nullable=False, default="Olá! Bem-vindo ao nosso atendimento. Como podemos ajudar hoje?")
+    prompt_personalidade = db.Column(db.Text, nullable=False, default="Você é um assistente virtual prestativo. Responda de forma curta, direta e amigável.")
+    tom_resposta = db.Column(db.String(20), nullable=False, default="Profissional")
+    mensagem_transbordo = db.Column(db.Text, nullable=False, default="Vou transferir o seu atendimento para um de nossos consultores. Aguarde um momento.")
     
     # Coluna legada
-    logo_b64 = db.Column(db.Text, nullable=True)
+    logo_b64 = db.Column(db.Text, nullable=True, default="")
 
     # Relacionamentos
     users = db.relationship('User', backref='empresa', lazy=True)
@@ -66,79 +66,3 @@ class RespostaAutomatica(db.Model):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    google_id = db.Column(db.String(120), unique=True, nullable=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
-    is_super_admin = db.Column(db.Boolean, default=False)
-
-    negocios = db.relationship('Negocio', backref='responsavel', lazy=True)
-
-
-class Etapa(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    nome = db.Column(db.String(50), nullable=False)
-    exibir_no_menu = db.Column(db.Boolean, default=False)
-    numero_menu = db.Column(db.Integer, nullable=True)
-
-    negocios = db.relationship('Negocio', backref='etapa', lazy=True)
-
-
-class Etiqueta(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    nome = db.Column(db.String(40), nullable=False)
-
-
-class Pessoa(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    nome = db.Column(db.String(100), nullable=False)
-    telefone = db.Column(db.String(20), nullable=False)
-    
-    # Controle de IA e Bot: 'menu', 'ia', 'humano', 'fechado'
-    status_atendimento = db.Column(db.String(20), default='humano')
-    ia_ativa = db.Column(db.Boolean, default=False)
-
-    # Relacionamentos
-    negocios = db.relationship('Negocio', backref='pessoa', lazy=True)
-    mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
-    etiquetas = db.relationship('Etiqueta', secondary=pessoa_etiqueta, backref=db.backref('pessoas', lazy=True))
-
-    @property
-    def qtd_nao_lidas(self):
-        return Mensagem.query.filter_by(
-            pessoa_id=self.id, 
-            tipo='inbound', 
-            lida=False
-        ).count()
-
-
-class Negocio(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    pessoa_id = db.Column(db.Integer, db.ForeignKey('pessoa.id'), nullable=False)
-    etapa_id = db.Column(db.Integer, db.ForeignKey('etapa.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
-    titulo = db.Column(db.String(100), nullable=False)
-    valor = db.Column(db.Float, default=0.0)
-
-
-class Mensagem(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    pessoa_id = db.Column(db.Integer, db.ForeignKey('pessoa.id'), nullable=False)
-    
-    mensagem = db.Column(db.Text, nullable=False)
-    tipo = db.Column(db.String(20), nullable=False)
-    lida = db.Column(db.Boolean, default=False)
-    data_envio = db.Column(db.DateTime(timezone=True), default=hora_atual_br)
-
-
-class Configuracao(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    prompt_ia = db.Column(db.Text, nullable=True)
