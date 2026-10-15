@@ -25,10 +25,10 @@ class Empresa(db.Model):
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     is_ativa = db.Column(db.Boolean, default=False)
     
-    # CORREÇÃO 1: Data de criação (Evita NotNullViolation)
+    # Data de criação (Evita NotNullViolation)
     data_criacao = db.Column(db.DateTime(timezone=True), default=hora_atual_br, nullable=False)
     
-    # CORREÇÃO 2: Configurações do Bot de Atendimento com valores padrão
+    # Configurações do Bot de Atendimento com valores padrão
     usar_menu_inicial = db.Column(db.Boolean, default=False)
     mensagem_saudacao = db.Column(db.Text, nullable=False, default="Olá! Bem-vindo ao nosso atendimento. Como podemos ajudar hoje?")
     prompt_personalidade = db.Column(db.Text, nullable=False, default="Você é um assistente virtual prestativo. Responda de forma curta, direta e amigável.")
@@ -68,6 +68,10 @@ class User(UserMixin, db.Model):
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
+    
+    # CORREÇÃO: CPF ajustado com nullable=True e default="" para evitar o erro de NotNullViolation
+    cpf = db.Column(db.String(20), nullable=True, default="")
+    
     google_id = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
@@ -141,6 +145,4 @@ class Mensagem(db.Model):
 class Configuracao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    
-    # CORREÇÃO 3: Adicionado nullable=False e default="" para a coluna da IA extra
     prompt_ia = db.Column(db.Text, nullable=False, default="")
