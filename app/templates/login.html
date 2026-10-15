@@ -1,182 +1,133 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Entrar | Optmiza CRM</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            noite: "#0F172A",
-            optmiza: "#0EA5E9",
-            profundo: "#0369A1",
-            claro: "#38BDF8",
-            aco: "#475569",
-            nevoa: "#F1F5F9"
-          },
-          fontFamily: {
-            display: ['"Space Grotesk"', "Helvetica Neue", "Arial", "sans-serif"],
-            body: ['"IBM Plex Sans"', "Helvetica Neue", "Arial", "sans-serif"]
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    :root {
-      box-sizing: border-box;
-      padding-top: env(safe-area-inset-top, 0px);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-    }
-    html, body { background: #F1F5F9; min-height: 100vh; }
-    @media (prefers-color-scheme: dark) {
-      html, body { background: #0B1220; }
-    }
-    @keyframes draw {
-      from { stroke-dasharray: 0 141.4; }
-      to { stroke-dasharray: 113.1 28.27; }
-    }
-    .draw { animation: draw 1.6s cubic-bezier(.65, 0, .35, 1) both; }
-    @media (prefers-reduced-motion: reduce) {
-      .draw { animation: none; }
-    }
-  </style>
-</head>
-<body class="font-body text-noite antialiased flex items-center justify-center min-h-screen p-4 sm:p-6 lg:p-10" style="background-color: #F1F5F9;">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entrar | Optmiza CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{keyframes:{marquee:{'0%':{transform:'translateX(0)'},'100%':{transform:'translateX(-50%)'}}},animation:{marquee:'marquee 36s linear infinite'}},colors:{noite:"#0F172A",optmiza:"#0EA5E9",profundo:"#0369A1",claro:"#38BDF8",aco:"#475569",nevoa:"#F1F5F9"},fontFamily:{display:['"Space Grotesk"',"Helvetica Neue","Arial","sans-serif"],body:['"IBM Plex Sans"',"Helvetica Neue","Arial","sans-serif"]}}}</script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{background:#F1F5F9;min-height:100vh}
+@keyframes draw{from{stroke-dasharray:0 141.4}to{stroke-dasharray:113.1 28.27}}.draw{animation:draw 1.6s cubic-bezier(.65,0,.35,1) both}
+@media (prefers-reduced-motion:reduce){.draw{animation:none}}
+</style></head>
+<body class="font-body text-[#0F172A] antialiased flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10">
 
-<!-- CARTÃO CENTRALIZADO -->
-<main class="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden grid lg:grid-cols-2 border border-slate-200/80 dark:border-slate-800">
+<main class="w-full max-w-[920px] grid lg:grid-cols-2 overflow-hidden rounded-3xl bg-white shadow-[0_28px_60px_-24px_rgba(15,23,42,.28)] ring-1 ring-slate-200">
 
-  <!-- COLUNA ESQUERDA: INSTITUCIONAL -->
-  <section class="relative overflow-hidden bg-noite text-white px-8 py-10 lg:px-16 lg:py-14 flex flex-col justify-between gap-16">
-    <svg viewBox="0 0 60 60" class="absolute pointer-events-none opacity-[.13]" style="right:-30%;bottom:-30%;width:min(760px,130vw)" aria-hidden="true">
-      <circle class="draw" cx="30" cy="30" r="22.5" fill="none" stroke="#0EA5E9" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/>
-    </svg>
+<section class="relative overflow-hidden bg-[#0F172A] text-white px-8 py-10 lg:px-12 lg:py-12 lg:min-h-[580px] flex flex-col justify-between gap-12">
+  <svg viewBox="0 0 60 60" class="absolute pointer-events-none opacity-[.10]" style="right:-130px;bottom:-150px;width:420px" aria-hidden="true"><circle class="draw" cx="30" cy="30" r="22.5" fill="none" stroke="#0EA5E9" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/></svg>
+  <div class="relative flex items-end gap-3"><svg viewBox="-4 10.6 302.44 81.8" class="w-36 text-slate-50" role="img" aria-label="Optmiza"><circle cx="30.2" cy="44.8" r="22.5" fill="none" stroke="#38BDF8" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/><path d="M65.87 84.4V34.5H73.14V39.62H74.3Q75.66 37.24 78.44 35.37Q81.21 33.5 86.39 33.5Q90.86 33.5 94.56 35.66Q98.27 37.82 100.54 41.88Q102.81 45.95 102.81 51.71V52.79Q102.81 58.55 100.58 62.62Q98.34 66.69 94.6 68.85Q90.86 71.01 86.39 71.01Q82.94 71.01 80.56 70.14Q78.18 69.28 76.74 67.95Q75.3 66.62 74.44 65.18H73.29V84.4ZM84.23 64.53Q89.13 64.53 92.22 61.43Q95.32 58.34 95.32 52.58V51.93Q95.32 46.24 92.19 43.14Q89.06 40.05 84.23 40.05Q79.48 40.05 76.35 43.14Q73.22 46.24 73.22 51.93V52.58Q73.22 58.34 76.35 61.43Q79.48 64.53 84.23 64.53ZM123.04 70Q119.8 70 117.89 68.06Q115.98 66.11 115.98 62.87V40.77H106.19V34.5H115.98V22.77H123.4V34.5H133.98V40.77H123.4V61.58Q123.4 63.74 125.42 63.74H132.83V70ZM141.69 70V34.5H148.96V38.68H150.11Q151.12 36.81 153.35 35.37Q155.58 33.93 159.4 33.93Q163.36 33.93 165.77 35.55Q168.18 37.17 169.41 39.69H170.56Q171.78 37.24 174.12 35.58Q176.46 33.93 180.78 33.93Q184.24 33.93 186.9 35.33Q189.57 36.74 191.15 39.51Q192.74 42.28 192.74 46.38V70H185.32V46.96Q185.32 43.72 183.56 41.96Q181.79 40.19 178.55 40.19Q175.1 40.19 173.01 42.42Q170.92 44.66 170.92 48.83V70H163.5V46.96Q163.5 43.72 161.74 41.96Q159.98 40.19 156.74 40.19Q153.28 40.19 151.19 42.42Q149.1 44.66 149.1 48.83V70ZM202.38 70V34.5H209.8V70ZM206.13 29.68Q203.97 29.68 202.49 28.28Q201.02 26.87 201.02 24.64Q201.02 22.41 202.49 21Q203.97 19.6 206.13 19.6Q208.36 19.6 209.8 21Q211.24 22.41 211.24 24.64Q211.24 26.87 209.8 28.28Q208.36 29.68 206.13 29.68ZM218.37 70V60.93L239.32 41.78V40.77H219.09V34.5H247.38V43.65L226.36 62.8V63.74H247.96V70ZM267.11 71.01Q263.3 71.01 260.31 69.71Q257.32 68.42 255.56 65.9Q253.79 63.38 253.79 59.78Q253.79 56.1 255.56 53.69Q257.32 51.28 260.38 50.06Q263.44 48.83 267.33 48.83H278.13V46.53Q278.13 43.43 276.26 41.56Q274.38 39.69 270.5 39.69Q266.68 39.69 264.66 41.49Q262.65 43.29 262 46.17L255.09 43.94Q255.95 41.06 257.86 38.72Q259.77 36.38 262.94 34.94Q266.1 33.5 270.57 33.5Q277.48 33.5 281.44 37.02Q285.4 40.55 285.4 47.03V61.65Q285.4 63.81 287.42 63.81H290.44V70H284.9Q282.38 70 280.79 68.7Q279.21 67.41 279.21 65.18V64.96H278.13Q277.55 66.04 276.4 67.48Q275.25 68.92 273.02 69.96Q270.78 71.01 267.11 71.01ZM268.19 64.89Q272.66 64.89 275.39 62.33Q278.13 59.78 278.13 55.31V54.59H267.76Q264.81 54.59 263.01 55.85Q261.21 57.11 261.21 59.56Q261.21 62.01 263.08 63.45Q264.95 64.89 268.19 64.89Z" fill="currentColor"/></svg><span class="mb-2 rounded border border-slate-600 px-1.5 py-0.5 text-xs font-medium text-slate-300">CRM</span></div>
+  <div class="relative max-w-xl">
+    <p class="text-[#38BDF8] font-medium text-sm">Sua operação comercial, em fluxo.</p>
+    <h1 class="mt-4 font-display font-medium tracking-tight leading-[1.04] text-3xl sm:text-4xl lg:text-[2.6rem]">Vendas e conversas no mesmo ritmo.</h1>
+    <p class="mt-5 text-base text-slate-300 leading-relaxed">Conecte o atendimento do WhatsApp ao seu funil de vendas e acompanhe cada oportunidade em um só lugar.</p>
+    <div class="mt-10 flex items-center text-sm text-slate-300" aria-hidden="true"><span class="flex items-center gap-2"><i class="size-2 rounded-full bg-slate-500"></i>Conversa</span><i class="mx-3 h-px flex-1 bg-slate-700"></i><span class="flex items-center gap-2"><i class="size-2 rounded-full bg-slate-500"></i>Oportunidade</span><i class="mx-3 h-px flex-1 bg-slate-700"></i><span class="flex items-center gap-2 text-white"><i class="size-2 rounded-full bg-[#0EA5E9]"></i>Venda</span></div>
+  </div>
+  <span aria-hidden="true"></span>
+</section>
 
-    <div class="relative flex items-end gap-3">
-      <svg viewBox="-4 10.6 302.44 81.8" class="w-32 text-slate-50" role="img" aria-label="Optmiza">
-        <circle cx="30.2" cy="44.8" r="22.5" fill="none" stroke="#38BDF8" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/>
-        <path d="M65.87 84.4V34.5H73.14V39.62H74.3Q75.66 37.24 78.44 35.37Q81.21 33.5 86.39 33.5Q90.86 33.5 94.56 35.66Q98.27 37.82 100.54 41.88Q102.81 45.95 102.81 51.71V52.79Q102.81 58.55 100.58 62.62Q98.34 66.69 94.6 68.85Q90.86 71.01 86.39 71.01Q82.94 71.01 80.56 70.14Q78.18 69.28 76.74 67.95Q75.3 66.62 74.44 65.18H73.29V84.4ZM84.23 64.53Q89.13 64.53 92.22 61.43Q95.32 58.34 95.32 52.58V51.93Q95.32 46.24 92.19 43.14Q89.06 40.05 84.23 40.05Q79.48 40.05 76.35 43.14Q73.22 46.24 73.22 51.93V52.58Q73.22 58.34 76.35 61.43Q79.48 64.53 84.23 64.53ZM123.04 70Q119.8 70 117.89 68.06Q115.98 66.11 115.98 62.87V40.77H106.19V34.5H115.98V22.77H123.4V34.5H133.98V40.77H123.4V61.58Q123.4 63.74 125.42 63.74H132.83V70ZM141.69 70V34.5H148.96V38.68H150.11Q151.12 36.81 153.35 35.37Q155.58 33.93 159.4 33.93Q163.36 33.93 165.77 35.55Q168.18 37.17 169.41 39.69H170.56Q171.78 37.24 174.12 35.58Q176.46 33.93 180.78 33.93Q184.24 33.93 186.9 35.33Q189.57 36.74 191.15 39.51Q192.74 42.28 192.74 46.38V70H185.32V46.96Q185.32 43.72 183.56 41.96Q181.79 40.19 178.55 40.19Q175.1 40.19 173.01 42.42Q170.92 44.66 170.92 48.83V70H163.5V46.96Q163.5 43.72 161.74 41.96Q159.98 40.19 156.74 40.19Q153.28 40.19 151.19 42.42Q149.1 44.66 149.1 48.83V70ZM202.38 70V34.5H209.8V70ZM206.13 29.68Q203.97 29.68 202.49 28.28Q201.02 26.87 201.02 24.64Q201.02 22.41 202.49 21Q203.97 19.6 206.13 19.6Q208.36 19.6 209.8 21Q211.24 22.41 211.24 24.64Q211.24 26.87 209.8 28.28Q208.36 29.68 206.13 29.68ZM218.37 70V60.93L239.32 41.78V40.77H219.09V34.5H247.38V43.65L226.36 62.8V63.74H247.96V70ZM267.11 71.01Q263.3 71.01 260.31 69.71Q257.32 68.42 255.56 65.9Q253.79 63.38 253.79 59.78Q253.79 56.1 255.56 53.69Q257.32 51.28 260.38 50.06Q263.44 48.83 267.33 48.83H278.13V46.53Q278.13 43.43 276.26 41.56Q274.38 39.69 270.5 39.69Q266.68 39.69 264.66 41.49Q262.65 43.29 262 46.17L255.09 43.94Q255.95 41.06 257.86 38.72Q259.77 36.38 262.94 34.94Q266.1 33.5 270.57 33.5Q277.48 33.5 281.44 37.02Q285.4 40.55 285.4 47.03V61.65Q285.4 63.81 287.42 63.81H290.44V70H284.9Q282.38 70 280.79 68.7Q279.21 67.41 279.21 65.18V64.96H278.13Q277.55 66.04 276.4 67.48Q275.25 68.92 273.02 69.96Q270.78 71.01 267.11 71.01ZM268.19 64.89Q272.66 64.89 275.39 62.33Q278.13 59.78 278.13 55.31V54.59H267.76Q264.81 54.59 263.01 55.85Q261.21 57.11 261.21 59.56Q261.21 62.01 263.08 63.45Q264.95 64.89 268.19 64.89Z" fill="currentColor"/>
-      </svg>
-      <span class="pb-0.5 text-sm font-medium text-slate-400">CRM</span>
-    </div>
+<section class="flex flex-col items-center justify-center px-8 py-12 lg:px-12 bg-white">
+  <div class="w-full max-w-sm">
+    <h2 class="font-display font-medium text-3xl tracking-tight">Entrar</h2>
+    <p class="mt-2 text-[#475569]">Acesse sua operação comercial.</p>
 
-    <div class="relative max-w-xl">
-      <p class="text-claro font-medium text-sm">Sua operação comercial, em fluxo.</p>
-      <h1 class="mt-4 font-display font-medium tracking-tight leading-[1.04] text-3xl sm:text-4xl lg:text-5xl">Vendas e conversas no mesmo ritmo.</h1>
-      <p class="mt-6 text-base text-slate-300 leading-relaxed">Conecte o atendimento do WhatsApp ao seu funil de vendas e acompanhe cada oportunidade em um só lugar.</p>
-      <div class="mt-10 flex items-center text-sm text-slate-300" aria-hidden="true">
-        <span>Conversa</span><i class="mx-3 h-px flex-1 bg-slate-600"></i>
-        <span>Oportunidade</span><i class="mx-3 h-px flex-1 bg-slate-600"></i>
-        <span>Venda</span><i class="mx-3 h-px w-6 bg-slate-600"></i>
-        <svg viewBox="0 0 60 60" class="w-6 h-6 flex-none" aria-hidden="true">
-          <circle cx="30" cy="30" r="22.5" fill="none" stroke="#0EA5E9" stroke-width="7.4" stroke-linecap="round" stroke-dasharray="113.1 28.27"/>
-        </svg>
-      </div>
-    </div>
-
-    <!-- VITRINE DE PARCEIROS NO RODAPÉ ESQUERDO -->
-    <div class="relative">
-      {% if empresas %}
-      <div class="mb-4">
-        <p class="text-[11px] uppercase tracking-wider text-slate-400 mb-2.5 font-medium">Empresas em fluxo com a Optmiza</p>
-        <div class="flex flex-wrap items-center gap-2.5">
-          {% for emp in empresas %}
-          <div class="h-8 px-2 bg-white/95 rounded-md flex items-center justify-center shadow-sm" title="{{ emp.nome }}">
-            <img src="{{ emp.logo_b64 }}" alt="{{ emp.nome }}" class="max-h-5 w-auto object-contain">
-          </div>
+    <!-- MENSAGENS E ALERTAS DO FLASK -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-5 space-y-2">
+          {% for category, message in messages %}
+            <div class="p-3.5 rounded-lg text-sm font-medium border {{ 'bg-emerald-50 border-emerald-200 text-emerald-800' if category == 'success' else 'bg-amber-50 border-amber-200 text-amber-800' }}">
+              {{ message }}
+            </div>
           {% endfor %}
         </div>
-      </div>
       {% endif %}
-      <p class="text-sm text-slate-500">Optmiza CRM</p>
+    {% endwith %}
+
+    {% if msg %}
+    <div class="mt-5 p-3.5 rounded-lg text-sm font-medium bg-sky-50 border border-sky-200 text-sky-800">
+      {{ msg }}
     </div>
-  </section>
+    {% endif %}
 
-  <!-- COLUNA DIREITA: FORMULÁRIO DE LOGIN -->
-  <section class="flex flex-col items-center justify-center px-6 py-12 lg:py-16">
-    <div class="w-full max-w-sm">
-      <h2 class="font-display font-medium text-3xl tracking-tight text-slate-900 dark:text-white">Entrar</h2>
-      <p class="mt-2 text-aco dark:text-slate-400">Acesse sua operação comercial.</p>
+    {% if erro %}
+    <div class="mt-5 p-3.5 rounded-lg text-sm font-medium bg-red-50 border border-red-200 text-red-700">
+      {{ erro }}
+    </div>
+    {% endif %}
 
-      <!-- ALERTAS E MENSAGENS -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <div class="mt-5 space-y-2">
-            {% for category, message in messages %}
-              <div class="p-3.5 rounded-lg text-sm font-medium border {{ 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-200' if category == 'success' else 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-200' }}">
-                {{ message }}
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-
-      {% if msg %}
-      <div class="mt-5 p-3.5 rounded-lg text-sm font-medium bg-sky-50 border border-sky-200 text-sky-800 dark:bg-sky-950/50 dark:border-sky-800 dark:text-sky-200">
-        {{ msg }}
-      </div>
-      {% endif %}
-
-      {% if erro %}
-      <div class="mt-5 p-3.5 rounded-lg text-sm font-medium bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/50 dark:border-red-800 dark:text-red-300">
-        {{ erro }}
-      </div>
-      {% endif %}
-
-      <!-- BOTÃO GOOGLE OAUTH -->
-      <a href="{{ url_for('main.login_google') }}" class="mt-8 w-full h-12 rounded-lg border border-slate-300 bg-white text-noite font-medium flex items-center justify-center gap-3 hover:bg-slate-50 dark:bg-[#111A2E] dark:text-slate-100 dark:border-slate-700 dark:hover:bg-[#16213A] transition-colors shadow-sm">
-        <svg viewBox="0 0 24 24" class="w-5 h-5 shrink-0" aria-hidden="true">
-          <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z"/>
-          <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.92l-3.88-3a7.2 7.2 0 0 1-10.7-3.78H1.34v3.09A12 12 0 0 0 12 24z"/>
-          <path fill="#FBBC05" d="M5.36 14.3a7.2 7.2 0 0 1 0-4.6V6.61H1.34a12 12 0 0 0 0 10.78l4.02-3.09z"/>
-          <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.61 4.59 1.8l3.44-3.44A11.5 11.5 0 0 0 12 0 12 12 0 0 0 1.34 6.61L5.36 9.7A7.2 7.2 0 0 1 12 4.75z"/>
-        </svg>
-        Entrar com Google
-      </a>
-
-      <div class="my-6 flex items-center gap-4 text-sm text-aco dark:text-slate-400">
-        <i class="h-px flex-1 bg-slate-300 dark:bg-slate-700"></i>ou entre com seu usuário<i class="h-px flex-1 bg-slate-300 dark:bg-slate-700"></i>
-      </div>
-
-      <!-- FORMULÁRIO DE LOGIN -->
-      <form method="POST" action="{{ url_for('main.login') }}" class="space-y-5">
-        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Usuário
-          <input name="username" required autocomplete="username" placeholder="Seu nome de usuário" class="mt-1.5 w-full h-12 rounded-lg border border-slate-300 bg-white px-4 text-noite placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-optmiza dark:bg-[#111A2E] dark:border-slate-700 dark:text-slate-100 text-sm">
-        </label>
-        <div>
-          <div class="flex items-center justify-between">
-            <label for="senha" class="text-sm font-medium text-slate-700 dark:text-slate-300">Senha</label>
-            <a href="#" onclick="alert('Solicite um link de redefinição de senha ao administrador da sua empresa.'); return false;" class="text-sm text-profundo dark:text-claro underline underline-offset-4">Esqueci a senha</a>
-          </div>
-          <div class="relative">
-            <input id="senha" type="password" name="password" required autocomplete="current-password" placeholder="Sua senha" class="mt-1.5 w-full h-12 rounded-lg border border-slate-300 bg-white px-4 text-noite placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-optmiza dark:bg-[#111A2E] dark:border-slate-700 dark:text-slate-100 pr-20 text-sm">
-            <button type="button" id="ver" class="absolute right-3 top-1/2 mt-[3px] -translate-y-1/2 text-sm font-medium text-aco dark:text-slate-400 px-2 py-1" aria-controls="senha">Mostrar</button>
-          </div>
+    <a href="{{ url_for('main.login_google') }}" class="mt-8 w-full h-12 rounded-lg border border-slate-300 bg-white text-[#0F172A] font-medium flex items-center justify-center gap-3 hover:bg-slate-50 shadow-sm transition-colors">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 shrink-0" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.92l-3.88-3a7.2 7.2 0 0 1-10.7-3.78H1.34v3.09A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.36 14.3a7.2 7.2 0 0 1 0-4.6V6.61H1.34a12 12 0 0 0 0 10.78l4.02-3.09z"/><path fill="#EA4335" d="M12 4.75c1.76 0 3.34.61 4.59 1.8l3.44-3.44A11.5 11.5 0 0 0 12 0 12 12 0 0 0 1.34 6.61L5.36 9.7A7.2 7.2 0 0 1 12 4.75z"/></svg>
+      Entrar com Google
+    </a>
+    
+    <div class="my-6 flex items-center gap-4 text-sm text-[#475569]"><i class="h-px flex-1 bg-slate-300"></i>ou entre com seu usuário<i class="h-px flex-1 bg-slate-300"></i></div>
+    
+    <form method="POST" action="{{ url_for('main.login') }}" class="space-y-5">
+      <label class="block text-sm font-medium">
+        Usuário
+        <input name="username" required autocomplete="username" placeholder="Seu nome de usuário" class="mt-1.5 w-full h-12 rounded-lg border border-slate-300 bg-white px-4 text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]">
+      </label>
+      <div>
+        <div class="flex items-center justify-between">
+          <label for="senha" class="text-sm font-medium">Senha</label>
+          <a href="#" onclick="alert('Solicite um link de redefinição de senha ao administrador da sua empresa.'); return false;" class="text-sm text-[#0369A1] underline underline-offset-4">Esqueci a senha</a>
         </div>
-        <button type="submit" class="w-full h-12 rounded-lg bg-profundo text-white font-medium hover:bg-noite dark:bg-optmiza dark:text-noite dark:hover:bg-claro transition-colors shadow-sm text-sm">
-          Entrar
-        </button>
-      </form>
-
-      <p class="mt-8 text-center text-sm text-aco dark:text-slate-400">
-        Ainda não tem uma empresa? <a href="{{ url_for('main.register') }}" class="font-medium text-profundo dark:text-claro underline underline-offset-4">Criar conta</a>
-      </p>
-    </div>
-
-    <p class="mt-14 text-xs text-aco dark:text-slate-500 text-center">
-      Desenvolvido por <strong class="font-medium">Pedro Marinho</strong>. Um produto <strong class="font-medium text-profundo dark:text-claro">Optmiza</strong>.
-    </p>
-  </section>
+        <div class="relative">
+          <input id="senha" type="password" name="password" required autocomplete="current-password" placeholder="Sua senha" class="mt-1.5 w-full h-12 rounded-lg border border-slate-300 bg-white px-4 text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] pr-20">
+          <button type="button" id="ver" class="absolute right-3 top-1/2 mt-[3px] -translate-y-1/2 text-sm font-medium text-[#475569]" aria-controls="senha">Mostrar</button>
+        </div>
+      </div>
+      <button type="submit" class="w-full h-12 rounded-lg bg-[#0369A1] text-white font-medium hover:bg-[#0F172A] transition-colors shadow-sm">Entrar</button>
+    </form>
+    
+    <p class="mt-8 text-center text-sm text-[#475569]">Ainda não tem uma empresa? <a href="{{ url_for('main.register') }}" class="font-medium text-[#0369A1] underline underline-offset-4">Criar conta</a></p>
+  </div>
+</section>
 
 </main>
+
+<!-- CARROSSEL DINÂMICO COM AS LOGOS DA BIBLIOTECA GLOBAL DO SUPER ADMIN -->
+<section class="mt-10 w-full max-w-[920px]" aria-label="Empresas que usam o Optmiza CRM">
+  <p class="text-center text-xs text-[#475569]">Empresas que usam o Optmiza CRM</p>
+  <div class="mt-5 overflow-hidden" style="-webkit-mask-image:linear-gradient(to right,transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(to right,transparent,#000 10%,#000 90%,transparent)">
+    <div class="flex w-max animate-marquee hover:[animation-play-state:paused] motion-reduce:animate-none motion-reduce:w-auto motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:gap-y-3">
+      
+      <ul class="flex shrink-0 items-center">
+        {% if empresas %}
+          {% for emp in empresas %}
+          <li class="mr-12 flex h-8 flex-none items-center whitespace-nowrap">
+            <img src="{{ emp.logo_b64 }}" alt="{{ emp.nome }}" class="max-h-7 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity">
+          </li>
+          {% endfor %}
+        {% else %}
+          <li class="mr-12 flex h-8 flex-none items-center whitespace-nowrap font-display text-lg font-medium text-[#475569]/70">Leyly Moda Fitness</li>
+          <li class="mr-12 flex h-8 flex-none items-center whitespace-nowrap font-display text-lg font-medium text-[#475569]/70">Optmiza CRM</li>
+        {% endif %}
+      </ul>
+
+      <ul class="flex shrink-0 items-center motion-reduce:hidden" aria-hidden="true">
+        {% if empresas %}
+          {% for emp in empresas %}
+          <li class="mr-12 flex h-8 flex-none items-center whitespace-nowrap">
+            <img src="{{ emp.logo_b64 }}" alt="{{ emp.nome }}" class="max-h-7 w-auto object-contain opacity-80">
+          </li>
+          {% endfor %}
+        {% else %}
+          <li class="mr-12 flex h-8 flex-none items-center whitespace-nowrap font-display text-lg font-medium text-[#475569]/70">Leyly Moda Fitness</li>
+          <li class="mr-12 flex h-8 flex-none items-center whitespace-nowrap font-display text-lg font-medium text-[#475569]/70">Optmiza CRM</li>
+        {% endif %}
+      </ul>
+
+    </div>
+  </div>
+</section>
+
+<p class="mt-8 text-center text-xs text-[#475569]">Desenvolvido por <strong class="font-medium">Pedro Marinho</strong>. Um produto <strong class="font-medium text-[#0369A1]">Optmiza</strong>.</p>
 
 <script>
   document.getElementById('ver').addEventListener('click', function() {
