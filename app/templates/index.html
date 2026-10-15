@@ -23,7 +23,7 @@
                             700: 'color-mix(in srgb, var(--brand-color) 85%, black)',
                             900: 'color-mix(in srgb, var(--brand-color) 65%, black)'
                         },
-                        surface: 'var(--surface-color)'
+                        surface: '#F8FAFC'
                     }
                 }
             }
@@ -32,9 +32,17 @@
     <style>
         :root {
             --brand-color: {{ (current_user.empresa.cor_primaria if current_user.is_authenticated and current_user.empresa and current_user.empresa.cor_primaria else '#2563eb') }};
-            --surface-color: {{ (current_user.empresa.cor_fundo if current_user.is_authenticated and current_user.empresa and current_user.empresa.cor_fundo else '#F8FAFC') }};
         }
-        body { background-color: var(--surface-color); }
+        body {
+            background-color: #F8FAFC;
+            {% if current_user.is_authenticated and current_user.empresa and current_user.empresa.bg_b64 %}
+            background-image: url('{{ current_user.empresa.bg_b64 }}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            {% endif %}
+        }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -46,7 +54,7 @@
 
     <!-- ÁREA PRINCIPAL -->
     <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-        <header class="h-20 px-8 flex justify-between items-center bg-white/75 backdrop-blur-md border-b border-slate-200/60 z-10 flex-shrink-0">
+        <header class="h-20 px-8 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-200/60 z-10 flex-shrink-0">
             <div class="flex items-center gap-4">
                 {% if current_user.is_authenticated and current_user.empresa and current_user.empresa.logo_b64 %}
                 <div class="h-11 w-auto max-w-[140px] bg-white border border-slate-200/80 rounded-xl p-1.5 flex items-center justify-center shadow-sm">
@@ -81,7 +89,7 @@
         <!-- KANBAN BOARD -->
         <main id="kanban-board" class="flex-1 overflow-x-auto p-8 flex space-x-6 items-start">
             {% for etapa in etapas %}
-            <div class="bg-white/60 backdrop-blur-sm rounded-[1.25rem] w-[320px] flex-shrink-0 flex flex-col max-h-full border border-slate-200/70 shadow-sm">
+            <div class="bg-white/75 backdrop-blur-md rounded-[1.25rem] w-[320px] flex-shrink-0 flex flex-col max-h-full border border-white/60 shadow-md">
                 <div class="p-4 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-brand-500"></div>
@@ -96,7 +104,11 @@
                         {% if current_user.is_admin or negocio.user_id == current_user.id or not negocio.user_id %}
                         
                         <div class="relative bg-white p-4 rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.06)] border border-slate-100 cursor-pointer hover:shadow-md hover:border-brand-200 transition-all group" 
-                             data-negocio-id="{{ negocio.id }}" data-pessoa-id="{{ negocio.pessoa.id }}" onclick="abrirChat({{ negocio.pessoa.id }}, {{ negocio.pessoa.nome | tojson }}, {{ negocio.pessoa.telefone | tojson }})">
+                             data-negocio-id="{{ negocio.id }}"
+                             data-pessoa-id="{{ negocio.pessoa.id }}"
+                             data-nome="{{ negocio.pessoa.nome }}"
+                             data-tel="{{ negocio.pessoa.telefone }}"
+                             onclick="abrirChat({{ negocio.pessoa.id }}, this.dataset.nome, this.dataset.tel)">
                             
                             {% if negocio.pessoa.qtd_nao_lidas > 0 %}
                             <span id="badge-{{ negocio.pessoa.id }}" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md border-2 border-white">{{ negocio.pessoa.qtd_nao_lidas }}</span>
@@ -152,7 +164,7 @@
         
         <!-- ASSINATURA NO RODAPÉ -->
         <footer class="bg-transparent pb-4 text-center z-10 w-full flex-shrink-0">
-            <p class="text-slate-500 bg-white/70 backdrop-blur-sm inline-block px-4 py-1 rounded-full shadow-sm text-[10px] tracking-widest uppercase">
+            <p class="text-slate-500 bg-white/80 backdrop-blur-sm inline-block px-4 py-1 rounded-full shadow-sm text-[10px] tracking-widest uppercase">
                 Desenvolvido por <strong class="text-slate-700">Pedro Marinho</strong>. Um produto <strong class="text-brand-600">Optmiza</strong>.
             </p>
         </footer>
