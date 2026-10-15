@@ -6,15 +6,22 @@
     <title>Painel Master - Optmiza CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen p-8">
     <div class="max-w-7xl mx-auto">
         <!-- Cabeçalho -->
         <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-slate-900">Painel Master</h1>
-                <p class="text-slate-500 text-sm mt-1">Gestão global de empresas, identidade visual e contas B2B</p>
+            <div class="flex items-center gap-4">
+                {% if current_user.is_authenticated and current_user.empresa and current_user.empresa.logo_b64 %}
+                    <img src="{{ current_user.empresa.logo_b64 }}" alt="Logo" class="h-10 w-auto object-contain bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+                {% endif %}
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900">Painel Master</h1>
+                    <p class="text-slate-500 text-sm mt-1">Gestão global de empresas, identidade visual e contas B2B</p>
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="document.getElementById('modal-nova-empresa').classList.remove('hidden')" class="bg-blue-600 border border-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2">
@@ -100,15 +107,16 @@
                                 </div>
                             </td>
                             
-                            <!-- PREVIEW DA IDENTIDADE VISUAL (LOGO + COR) -->
+                            <!-- PREVIEW DA IDENTIDADE VISUAL (LOGO + COR PRIMÁRIA + COR DE FUNDO) -->
                             <td class="p-5 text-center">
-                                <div class="inline-flex items-center gap-2.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
+                                <div class="inline-flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
                                     {% if empresa.logo_b64 %}
                                         <img src="{{ empresa.logo_b64 }}" alt="Logo" class="h-7 w-7 object-contain bg-white rounded border border-slate-200 p-0.5">
                                     {% else %}
                                         <div class="h-7 w-7 rounded bg-white border border-dashed border-slate-300 flex items-center justify-center text-[8px] text-slate-400 font-bold">Sem</div>
                                     {% endif %}
-                                    <span class="w-5 h-5 rounded-full border border-slate-300 shadow-inner" style="background-color: {{ empresa.cor_primaria or '#2563eb' }};" title="Cor: {{ empresa.cor_primaria or '#2563eb' }}"></span>
+                                    <span class="w-5 h-5 rounded-full border border-slate-300 shadow-inner" style="background-color: {{ empresa.cor_primaria or '#2563eb' }};" title="Cor Primária: {{ empresa.cor_primaria or '#2563eb' }}"></span>
+                                    <span class="w-5 h-5 rounded-md border border-slate-300 shadow-inner" style="background-color: {{ empresa.cor_fundo or '#F8FAFC' }};" title="Cor de Fundo: {{ empresa.cor_fundo or '#F8FAFC' }}"></span>
                                 </div>
                             </td>
 
@@ -126,14 +134,14 @@
                             <!-- COLUNA DE AÇÕES -->
                             <td class="p-5">
                                 <div class="flex items-center justify-end gap-2 flex-wrap">
-                                    <!-- Botão Personalizar Terminal (Logo e Cores) -->
-                                    <button onclick="abrirModalBranding({{ empresa.id }}, '{{ empresa.nome }}', '{{ empresa.cor_primaria or '#2563eb' }}')" class="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-amber-200/70 transition-colors flex items-center gap-1.5" title="Personalizar Logo e Cores do Terminal do Cliente">
+                                    <!-- Botão Personalizar Terminal (Logo, Cor Primária e Fundo) -->
+                                    <button onclick="abrirModalBranding({{ empresa.id }}, {{ empresa.nome | tojson }}, '{{ empresa.cor_primaria or '#2563eb' }}', '{{ empresa.cor_fundo or '#F8FAFC' }}')" class="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-amber-200/70 transition-colors flex items-center gap-1.5" title="Personalizar Logo, Cores e Background do Cliente">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
                                         Marca & Cores
                                     </button>
 
                                     <!-- Botão de Configurar IA -->
-                                    <button onclick="abrirModalConfigIA({{ empresa.id }}, '{{ empresa.nome }}')" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-100 transition-colors flex items-center gap-1.5" title="Personalizar Inteligência Artificial">
+                                    <button onclick="abrirModalConfigIA({{ empresa.id }}, {{ empresa.nome | tojson }})" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-100 transition-colors flex items-center gap-1.5" title="Personalizar Inteligência Artificial">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                         Config. IA
                                     </button>
@@ -192,16 +200,24 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor do Terminal</label>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor de Destaque</label>
                         <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl">
                             <input type="color" name="cor_primaria" value="#2563eb" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
-                            <span class="text-xs text-slate-500 font-medium">Cor Principal</span>
+                            <span class="text-xs text-slate-500 font-medium">Botões/Tema</span>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Logo (Opcional)</label>
-                        <input type="file" name="logo" accept="image/*" class="w-full text-[11px] text-slate-500 file:cursor-pointer file:py-2 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-blue-50 file:text-blue-700 border border-slate-200 rounded-xl p-1.5 bg-slate-50">
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor de Fundo</label>
+                        <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl">
+                            <input type="color" name="cor_fundo" value="#F8FAFC" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
+                            <span class="text-xs text-slate-500 font-medium">Background</span>
+                        </div>
                     </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Logótipo (Opcional)</label>
+                    <input type="file" name="logo" accept="image/*" class="w-full text-[11px] text-slate-500 file:cursor-pointer file:py-2 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-blue-50 file:text-blue-700 border border-slate-200 rounded-xl p-1.5 bg-slate-50">
                 </div>
                 
                 <div class="pt-3">
@@ -213,7 +229,7 @@
         </div>
     </div>
 
-    <!-- MODAL: Personalizar Marca & Cores da Empresa -->
+    <!-- MODAL: Personalizar Marca, Cores e Background da Empresa -->
     <div id="modal-branding" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -225,11 +241,24 @@
             </div>
             
             <form id="form-branding" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor Primária do Sistema</label>
-                    <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
-                        <input type="color" id="branding_cor" name="cor_primaria" value="#2563eb" class="w-10 h-10 rounded-lg cursor-pointer border-0 bg-transparent">
-                        <span class="text-xs text-slate-600">Escolha a cor para botões, destaques e cabeçalho deste cliente.</span>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor Primária (Tema)</label>
+                        <div class="flex items-center gap-2.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                            <input type="color" id="branding_cor" name="cor_primaria" value="#2563eb" class="w-9 h-9 rounded-lg cursor-pointer border-0 bg-transparent shrink-0">
+                            <span class="text-[11px] text-slate-600 leading-tight">Botões, ícones e destaques</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Cor de Fundo</label>
+                            <button type="button" onclick="document.getElementById('branding_fundo').value = '#F8FAFC'" class="text-[10px] font-bold text-blue-600 hover:underline">Padrão</button>
+                        </div>
+                        <div class="flex items-center gap-2.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                            <input type="color" id="branding_fundo" name="cor_fundo" value="#F8FAFC" class="w-9 h-9 rounded-lg cursor-pointer border-0 bg-transparent shrink-0">
+                            <span class="text-[11px] text-slate-600 leading-tight">Background do terminal</span>
+                        </div>
                     </div>
                 </div>
 
@@ -324,9 +353,10 @@
 
     <!-- SCRIPTS MESTRES -->
     <script>
-        function abrirModalBranding(empresaId, empresaNome, corAtual) {
+        function abrirModalBranding(empresaId, empresaNome, corAtual, corFundoAtual) {
             document.getElementById('branding-empresa-nome').textContent = empresaNome;
             document.getElementById('branding_cor').value = corAtual || '#2563eb';
+            document.getElementById('branding_fundo').value = corFundoAtual || '#F8FAFC';
             document.getElementById('remover_logo').checked = false;
             document.getElementById('form-branding').action = `/optmiza-master/empresa/${empresaId}/branding`;
             document.getElementById('modal-branding').classList.remove('hidden');
