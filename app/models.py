@@ -70,7 +70,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=True)
     
     # CORREÇÃO: CPF ajustado com nullable=True e default="" para evitar o erro de NotNullViolation
-    cpf = db.Column(db.String(20), nullable=True, default="")
+    cpf = db.Column(db.String(20), nullable=True, default=None)
     
     google_id = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
