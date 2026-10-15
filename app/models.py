@@ -66,3 +66,79 @@ class RespostaAutomatica(db.Model):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    google_id = db.Column(db.String(120), unique=True, nullable=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    is_super_admin = db.Column(db.Boolean, default=False)
+
+    negocios = db.relationship('Negocio', backref='responsavel', lazy=True)
+
+
+class Etapa(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    nome = db.Column(db.String(50), nullable=False)
+    exibir_no_menu = db.Column(db.Boolean, default=False)
+    numero_menu = db.Column(db.Integer, nullable=True)
+
+    negocios = db.relationship('Negocio', backref='etapa', lazy=True)
+
+
+class Etiqueta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    nome = db.Column(db.String(40), nullable=False)
+
+
+class Pessoa(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    nome = db.Column(db.String(100), nullable=False)
+    telefone = db.Column(db.String(20), nullable=False)
+    
+    # Controle de IA e Bot: 'menu', 'ia', 'humano', 'fechado'
+    status_atendimento = db.Column(db.String(20), default='humano')
+    ia_ativa = db.Column(db.Boolean, default=False)
+
+    # Relacionamentos
+    negocios = db.relationship('Negocio', backref='pessoa', lazy=True)
+    mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
+    etiquetas = db.relationship('Etiqueta', secondary=pessoa_etiqueta, backref=db.backref('pessoas', lazy=True))
+
+    @property
+    def qtd_nao_lidas(self):
+        return Mensagem.query.filter_by(
+            pessoa_id=self.id, 
+            tipo='inbound', 
+            lida=False
+        ).count()
+
+
+class Negocio(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    pessoa_id = db.Column(db.Integer, db.ForeignKey('pessoa.id'), nullable=False)
+    etapa_id = db.Column(db.Integer, db.ForeignKey('etapa.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    titulo = db.Column(db.String(100), nullable=False)
+    valor = db.Column(db.Float, default=0.0)
+
+
+class Mensagem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    pessoa_id = db.Column(db.Integer, db.ForeignKey('pessoa.id'), nullable=False)
+    
+    mensagem = db.Column(db.Text, nullable=False)
+    tipo = db.Column(db.String(20), nullable=False) # 'inbound' (recebida) ou 'outbound' (enviada)
+    lida = db.Column(db.Boolean, default=False)
+    data_envio = db.Column(db.DateTime(timezone=True), default=hora_atual_br)
+
+
+class Configuracao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
+    prompt_ia = db.Column(db.Text, nullable=True)
