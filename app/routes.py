@@ -103,12 +103,22 @@ AUTH_HTML = """
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #F8FAFC;
+            {% if bg_b64 %}
+            background-image: url('{{ bg_b64 }}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            {% endif %}
+        }
         :root { --cor-primaria: {{ cor_primaria or '#2563eb' }}; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-[400px] border border-slate-100 mb-6">
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-xl w-full max-w-[400px] border border-slate-100 mb-6">
         {% if logo_b64 %}
             <div class="h-16 w-32 mx-auto flex items-center justify-center mb-4">
                 <img src="{{ logo_b64 }}" alt="Logo" class="max-h-full max-w-full object-contain">
@@ -163,8 +173,8 @@ AUTH_HTML = """
         {% endif %}
     </div>
     
-    <p class="text-slate-400 text-[10px] tracking-wide text-center">
-        Desenvolvido por <strong class="text-slate-500">Pedro Marinho</strong>. Um produto <strong class="text-blue-600">Optmiza</strong>.
+    <p class="text-slate-500 text-[10px] tracking-wide text-center bg-white/85 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-sm">
+        Desenvolvido por <strong class="text-slate-700">Pedro Marinho</strong>. Um produto <strong style="color: var(--cor-primaria);">Optmiza</strong>.
     </p>
 </body>
 </html>
@@ -446,7 +456,7 @@ def admin_config_empresa(id):
     db.session.commit()
     return jsonify({"status": "sucesso"})
 
-# --- NOVA ROTA: PERSONALIZAÇÃO VISUAL (LOGO E CORES DO CLIENTE) ---
+# --- PERSONALIZAÇÃO VISUAL (LOGO, COR PRIMÁRIA E IMAGEM DE FUNDO DO TERMINAL) ---
 @bp.route('/optmiza-master/empresa/<int:id>/branding', methods=['POST'])
 @login_required
 def admin_branding_empresa(id):
@@ -462,17 +472,28 @@ def admin_branding_empresa(id):
     if cor_primaria:
         empresa.cor_primaria = cor_primaria
 
-    file = request.files.get('logo')
-    if file and file.filename:
-        encoded_string = base64.b64encode(file.read()).decode('utf-8')
-        mimetype = file.mimetype or 'image/png'
-        empresa.logo_b64 = f"data:{mimetype};base64,{encoded_string}"
+    # Upload de Logótipo
+    file_logo = request.files.get('logo')
+    if file_logo and file_logo.filename:
+        encoded_logo = base64.b64encode(file_logo.read()).decode('utf-8')
+        mimetype_logo = file_logo.mimetype or 'image/png'
+        empresa.logo_b64 = f"data:{mimetype_logo};base64,{encoded_logo}"
 
     if request.form.get('remover_logo') == '1':
         empresa.logo_b64 = ""
 
+    # Upload de Imagem de Fundo (Background)
+    file_bg = request.files.get('background')
+    if file_bg and file_bg.filename:
+        encoded_bg = base64.b64encode(file_bg.read()).decode('utf-8')
+        mimetype_bg = file_bg.mimetype or 'image/jpeg'
+        empresa.bg_b64 = f"data:{mimetype_bg};base64,{encoded_bg}"
+
+    if request.form.get('remover_bg') == '1':
+        empresa.bg_b64 = ""
+
     db.session.commit()
-    flash(f'Identidade visual da empresa "{empresa.nome}" atualizada com sucesso!', 'success')
+    flash(f'Identidade visual e imagem de fundo da empresa "{empresa.nome}" atualizadas com sucesso!', 'success')
     return redirect(url_for('main.optmiza_master'))
 
 # --- ROTAS DE LOGÓTIPOS GLOBAIS ---
@@ -539,18 +560,26 @@ def admin_nova_empresa():
         return redirect(url_for('main.optmiza_master'))
 
     logo_b64_str = ""
-    file = request.files.get('logo')
-    if file and file.filename:
-        encoded_string = base64.b64encode(file.read()).decode('utf-8')
-        mimetype = file.mimetype or 'image/png'
-        logo_b64_str = f"data:{mimetype};base64,{encoded_string}"
+    file_logo = request.files.get('logo')
+    if file_logo and file_logo.filename:
+        encoded_logo = base64.b64encode(file_logo.read()).decode('utf-8')
+        mimetype_logo = file_logo.mimetype or 'image/png'
+        logo_b64_str = f"data:{mimetype_logo};base64,{encoded_logo}"
+
+    bg_b64_str = ""
+    file_bg = request.files.get('background')
+    if file_bg and file_bg.filename:
+        encoded_bg = base64.b64encode(file_bg.read()).decode('utf-8')
+        mimetype_bg = file_bg.mimetype or 'image/jpeg'
+        bg_b64_str = f"data:{mimetype_bg};base64,{encoded_bg}"
 
     empresa = Empresa(
         nome=nome_empresa,
         instancia_whatsapp=instancia,
         is_ativa=True,
         cor_primaria=cor_primaria,
-        logo_b64=logo_b64_str
+        logo_b64=logo_b64_str,
+        bg_b64=bg_b64_str
     )
     db.session.add(empresa)
     db.session.flush()
@@ -610,7 +639,7 @@ def processar_convite(token):
             return render_template_string(
                 AUTH_HTML, title=f"Entrar em {empresa.nome}", subtitle="Crie o seu acesso ou entre com o Google",
                 action="invite", btn_text="Concluir Registo", erro="Este nome de utilizador já está em uso.",
-                token=token, logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria
+                token=token, logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria, bg_b64=empresa.bg_b64
             )
         novo_user = User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=data.get('is_admin', True))
         db.session.add(novo_user)
@@ -621,7 +650,7 @@ def processar_convite(token):
     return render_template_string(
         AUTH_HTML, title=f"Entrar em {empresa.nome}", subtitle="Crie o seu acesso na plataforma",
         action="invite", btn_text="Concluir Registo", token=token,
-        logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria
+        logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria, bg_b64=empresa.bg_b64
     )
 
 @bp.route('/api/usuarios/<int:id>/reset_link', methods=['POST'])
