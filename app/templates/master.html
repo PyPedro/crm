@@ -14,7 +14,7 @@
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Painel Master</h1>
-                <p class="text-slate-500 text-sm mt-1">Gestão global de empresas e contas B2B</p>
+                <p class="text-slate-500 text-sm mt-1">Gestão global de empresas, identidade visual e contas B2B</p>
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="document.getElementById('modal-nova-empresa').classList.remove('hidden')" class="bg-blue-600 border border-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2">
@@ -39,20 +39,16 @@
           {% endif %}
         {% endwith %}
 
-        <!-- SECÇÃO: BIBLIOTECA GLOBAL DE LOGÓTIPOS -->
+        <!-- SECÇÃO: BIBLIOTECA GLOBAL DE LOGÓTIPOS (Vitrine do Login) -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 relative overflow-hidden">
-            <div class="absolute right-0 top-0 opacity-5 pt-4 pr-4 pointer-events-none">
-                <svg class="w-32 h-32 text-slate-900" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z"/></svg>
-            </div>
-            
             <div class="relative z-10">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
-                        <h2 class="text-lg font-bold text-slate-800">Biblioteca Global de Logótipos</h2>
-                        <p class="text-xs text-slate-500 mt-1">Faça upload de imagens PNG. Elas vão aparecer como clientes do Optmiza na página de login e ecrãs públicos.</p>
+                        <h2 class="text-lg font-bold text-slate-800">Biblioteca Global de Logótipos (Vitrine Pública)</h2>
+                        <p class="text-xs text-slate-500 mt-1">Faça upload de imagens PNG avulsas para exibir no carrossel de clientes da página de login.</p>
                     </div>
                     <button onclick="document.getElementById('modal-novo-logo').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap">
-                        + Enviar Logótipo
+                        + Enviar Logótipo Global
                     </button>
                 </div>
 
@@ -65,21 +61,21 @@
                         <span class="text-[10px] font-bold text-slate-600 truncate w-full text-center" title="{{ logo.nome }}">{{ logo.nome }}</span>
                         
                         <form action="{{ url_for('main.admin_apagar_logo_global', id=logo.id) }}" method="POST" class="absolute -top-2 -right-2 hidden group-hover:block z-10">
-                            <button type="submit" onclick="return confirm('Deseja mesmo apagar este logótipo da biblioteca?')" class="bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors">
+                            <button type="submit" onclick="return confirm('Deseja apagar este logótipo da biblioteca?')" class="bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </form>
                     </div>
                     {% else %}
-                    <div class="col-span-full py-8 text-center text-slate-400 text-sm font-medium border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                        Nenhum logótipo carregado. A biblioteca está vazia.
+                    <div class="col-span-full py-6 text-center text-slate-400 text-sm font-medium border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                        Nenhum logótipo global carregado.
                     </div>
                     {% endfor %}
                 </div>
             </div>
         </div>
 
-        <!-- TABELA DE EMPRESAS (Com novas ações) -->
+        <!-- TABELA DE EMPRESAS -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -87,9 +83,10 @@
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-widest text-slate-500">
                             <th class="p-5 font-bold">ID</th>
                             <th class="p-5 font-bold">Empresa & Instância</th>
+                            <th class="p-5 font-bold text-center">Identidade do Terminal</th>
                             <th class="p-5 font-bold text-center">Usuários</th>
                             <th class="p-5 font-bold text-center">Status</th>
-                            <th class="p-5 font-bold text-right">Ações Rápidas</th>
+                            <th class="p-5 font-bold text-right">Central de Comando</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -98,10 +95,23 @@
                             <td class="p-5 text-sm font-bold text-slate-400">#{{ empresa.id }}</td>
                             <td class="p-5">
                                 <div class="text-sm font-bold text-slate-800">{{ empresa.nome }}</div>
-                                <div class="text-[11px] text-slate-400 font-medium mt-1 truncate max-w-[250px]" title="{{ empresa.instancia_whatsapp }}">
+                                <div class="text-[11px] text-slate-400 font-medium mt-1 truncate max-w-[220px]" title="{{ empresa.instancia_whatsapp }}">
                                     {{ empresa.instancia_whatsapp }}
                                 </div>
                             </td>
+                            
+                            <!-- PREVIEW DA IDENTIDADE VISUAL (LOGO + COR) -->
+                            <td class="p-5 text-center">
+                                <div class="inline-flex items-center gap-2.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
+                                    {% if empresa.logo_b64 %}
+                                        <img src="{{ empresa.logo_b64 }}" alt="Logo" class="h-7 w-7 object-contain bg-white rounded border border-slate-200 p-0.5">
+                                    {% else %}
+                                        <div class="h-7 w-7 rounded bg-white border border-dashed border-slate-300 flex items-center justify-center text-[8px] text-slate-400 font-bold">Sem</div>
+                                    {% endif %}
+                                    <span class="w-5 h-5 rounded-full border border-slate-300 shadow-inner" style="background-color: {{ empresa.cor_primaria or '#2563eb' }};" title="Cor: {{ empresa.cor_primaria or '#2563eb' }}"></span>
+                                </div>
+                            </td>
+
                             <td class="p-5 text-sm text-slate-600 text-center font-bold">
                                 {{ total_usuarios.get(empresa.id, 0) }}
                             </td>
@@ -113,17 +123,23 @@
                                 {% endif %}
                             </td>
                             
-                            <!-- COLUNA DE AÇÕES -> AGORA É UM PAINEL DE CONTROLO -->
+                            <!-- COLUNA DE AÇÕES -->
                             <td class="p-5">
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-end gap-2 flex-wrap">
+                                    <!-- Botão Personalizar Terminal (Logo e Cores) -->
+                                    <button onclick="abrirModalBranding({{ empresa.id }}, '{{ empresa.nome }}', '{{ empresa.cor_primaria or '#2563eb' }}')" class="bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-amber-200/70 transition-colors flex items-center gap-1.5" title="Personalizar Logo e Cores do Terminal do Cliente">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+                                        Marca & Cores
+                                    </button>
+
                                     <!-- Botão de Configurar IA -->
-                                    <button onclick="abrirModalConfigIA({{ empresa.id }}, '{{ empresa.nome }}')" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-100 transition-colors flex items-center gap-1.5" title="Personalizar Inteligência Artificial">
+                                    <button onclick="abrirModalConfigIA({{ empresa.id }}, '{{ empresa.nome }}')" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-100 transition-colors flex items-center gap-1.5" title="Personalizar Inteligência Artificial">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                         Config. IA
                                     </button>
                                     
                                     <!-- Botão de Gerar Link Convite -->
-                                    <button onclick="gerarConviteMaster({{ empresa.id }})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-800 text-xs font-bold py-1.5 px-3 rounded-lg border border-blue-100 transition-colors flex items-center gap-1.5" title="Gerar link de acesso para um utilizador">
+                                    <button onclick="gerarConviteMaster({{ empresa.id }})" class="bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5" title="Gerar link de convite (suporta Gmail e senha)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                                         Convite
                                     </button>
@@ -146,7 +162,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="p-12 text-center text-slate-500 text-sm font-medium">Nenhuma empresa registada no sistema até ao momento.</td>
+                            <td colspan="6" class="p-12 text-center text-slate-500 text-sm font-medium">Nenhuma empresa registada no sistema até ao momento.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -155,11 +171,92 @@
         </div>
     </div>
 
+    <!-- MODAL: Nova Empresa (Sem exigir Usuário e Senha!) -->
+    <div id="modal-nova-empresa" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div>
+                    <h3 class="font-bold text-slate-800">Cadastrar Nova Empresa</h3>
+                    <p class="text-[11px] text-slate-500">Crie o ambiente e envie o link de convite ao cliente</p>
+                </div>
+                <button onclick="document.getElementById('modal-nova-empresa').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+            </div>
+            
+            <form action="{{ url_for('main.admin_nova_empresa') }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Nome da Empresa *</label>
+                    <input type="text" name="nome_empresa" required placeholder="Ex: Leyly Moda Fitness" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor do Terminal</label>
+                        <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl">
+                            <input type="color" name="cor_primaria" value="#2563eb" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent">
+                            <span class="text-xs text-slate-500 font-medium">Cor Principal</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Logo (Opcional)</label>
+                        <input type="file" name="logo" accept="image/*" class="w-full text-[11px] text-slate-500 file:cursor-pointer file:py-2 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-blue-50 file:text-blue-700 border border-slate-200 rounded-xl p-1.5 bg-slate-50">
+                    </div>
+                </div>
+                
+                <div class="pt-3">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md">
+                        Criar Empresa e Ativar Instância
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Personalizar Marca & Cores da Empresa -->
+    <div id="modal-branding" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm">Personalizar Terminal do Cliente</h3>
+                    <p id="branding-empresa-nome" class="text-xs text-slate-500 mt-0.5">Empresa</p>
+                </div>
+                <button onclick="document.getElementById('modal-branding').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+            </div>
+            
+            <form id="form-branding" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Cor Primária do Sistema</label>
+                    <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                        <input type="color" id="branding_cor" name="cor_primaria" value="#2563eb" class="w-10 h-10 rounded-lg cursor-pointer border-0 bg-transparent">
+                        <span class="text-xs text-slate-600">Escolha a cor para botões, destaques e cabeçalho deste cliente.</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Logótipo do Cliente (PNG/JPG)</label>
+                    <input type="file" name="logo" accept="image/*" class="w-full text-xs text-slate-500 file:cursor-pointer file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all border border-slate-200 rounded-xl p-2 bg-slate-50">
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="remover_logo" name="remover_logo" value="1" class="rounded border-slate-300 text-red-600 focus:ring-red-500">
+                    <label for="remover_logo" class="text-xs text-slate-500">Remover logótipo atual da empresa</label>
+                </div>
+                
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm">
+                        Guardar Identidade Visual
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL: Enviar Novo Logótipo Global -->
     <div id="modal-novo-logo" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 class="font-bold text-slate-800 text-sm">Adicionar à Biblioteca</h3>
+                <h3 class="font-bold text-slate-800 text-sm">Adicionar à Biblioteca Global</h3>
                 <button onclick="document.getElementById('modal-novo-logo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
             </div>
             
@@ -175,37 +272,6 @@
                 <div class="pt-2">
                     <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm">
                         Enviar Logótipo
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: Nova Empresa -->
-    <div id="modal-nova-empresa" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 class="font-bold text-slate-800">Cadastrar Nova Empresa</h3>
-                <button onclick="document.getElementById('modal-nova-empresa').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
-            </div>
-            
-            <form action="{{ url_for('main.admin_nova_empresa') }}" method="POST" class="p-6 space-y-4">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Nome da Empresa</label>
-                    <input type="text" name="nome_empresa" required placeholder="Ex: Optmiza Tecnologia" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Usuário Administrador</label>
-                    <input type="text" name="username" required placeholder="Ex: admin.empresa" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Senha Provisória</label>
-                    <input type="password" name="password" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                </div>
-                <div class="pt-4">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)]">
-                        Criar e Ativar Empresa
                     </button>
                 </div>
             </form>
@@ -250,7 +316,6 @@
             </div>
             <div class="p-6 border-t border-slate-100 shrink-0">
                 <button onclick="salvarConfigIA()" id="btn-salvar-ia" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     Salvar Configurações de IA
                 </button>
             </div>
@@ -259,7 +324,14 @@
 
     <!-- SCRIPTS MESTRES -->
     <script>
-        // --- 1. GERAR CONVITE VIA MASTER ---
+        function abrirModalBranding(empresaId, empresaNome, corAtual) {
+            document.getElementById('branding-empresa-nome').textContent = empresaNome;
+            document.getElementById('branding_cor').value = corAtual || '#2563eb';
+            document.getElementById('remover_logo').checked = false;
+            document.getElementById('form-branding').action = `/optmiza-master/empresa/${empresaId}/branding`;
+            document.getElementById('modal-branding').classList.remove('hidden');
+        }
+
         async function gerarConviteMaster(empresaId) {
             try {
                 const res = await fetch(`/optmiza-master/empresa/${empresaId}/invite`, {
@@ -269,12 +341,10 @@
                 const data = await res.json();
                 
                 if (data.link) {
-                    // Tenta copiar nativamente
                     try {
                         await navigator.clipboard.writeText(data.link);
-                        alert("✅ Convite gerado e COPIADO com sucesso!\n\nPode colar no WhatsApp do cliente.");
+                        alert("✅ Link de convite gerado e COPIADO!\n\nO cliente poderá criar a conta usando o Gmail (Google) ou definindo um utilizador e senha.");
                     } catch (err) {
-                        // Fallback caso o navegador bloqueie a área de transferência
                         prompt("✅ Link gerado! Copie o endereço abaixo:", data.link);
                     }
                 } else {
@@ -285,13 +355,11 @@
             }
         }
 
-        // --- 2. CONFIGURAR IA VIA MASTER ---
         async function abrirModalConfigIA(empresaId, empresaNome) {
             document.getElementById('ia_empresa_id').value = empresaId;
             document.getElementById('ia-empresa-nome').textContent = empresaNome;
             document.getElementById('modal-config-ia').classList.remove('hidden');
             
-            // Colocar os campos a "Carregar..."
             document.getElementById('ia_saudacao').value = 'Carregando...';
             document.getElementById('ia_transbordo').value = 'Carregando...';
             document.getElementById('ia_personalidade').value = 'Carregando...';
@@ -332,7 +400,7 @@
                 });
                 
                 if (res.ok) {
-                    alert("Configurações de IA da empresa atualizadas com sucesso!");
+                    alert("Configurações de IA atualizadas com sucesso!");
                     document.getElementById('modal-config-ia').classList.add('hidden');
                 } else {
                     alert("Erro ao salvar.");
