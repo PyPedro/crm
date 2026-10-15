@@ -156,7 +156,10 @@ def register():
     db.session.flush()
     db.session.add(User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=True))
     db.session.add_all([Etapa(empresa_id=empresa.id, nome=nome) for nome in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')])
-    db.session.add(Configuracao(empresa_id=empresa.id))
+    
+    # CORREÇÃO: Passando prompt_ia="" explicitamente
+    db.session.add(Configuracao(empresa_id=empresa.id, prompt_ia=""))
+    
     db.session.commit()
     flash('Cadastro realizado! A sua conta passará por uma análise e será ativada em breve pela nossa equipa.', 'success')
     return redirect(url_for('main.login'))
@@ -274,7 +277,10 @@ def completar_cadastro():
         db.session.add(User(empresa_id=empresa.id, username=nome_utilizador, email=email, google_id=google_id, password_hash=generate_password_hash(secrets.token_urlsafe(32)), is_admin=True))
         
     db.session.add_all([Etapa(empresa_id=empresa.id, nome=etapa) for etapa in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')])
-    db.session.add(Configuracao(empresa_id=empresa.id))
+    
+    # CORREÇÃO: Passando prompt_ia="" explicitamente
+    db.session.add(Configuracao(empresa_id=empresa.id, prompt_ia=""))
+    
     db.session.commit()
     session.pop('registro_google_email', None)
     session.pop('registro_google_google_id', None)
@@ -435,7 +441,10 @@ def admin_nova_empresa():
     admin_user = User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=True)
     db.session.add(admin_user)
     db.session.add_all([Etapa(empresa_id=empresa.id, nome=nome) for nome in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')])
-    db.session.add(Configuracao(empresa_id=empresa.id))
+    
+    # CORREÇÃO: Passando prompt_ia="" explicitamente
+    db.session.add(Configuracao(empresa_id=empresa.id, prompt_ia=""))
+    
     db.session.commit()
     flash(f'A empresa "{nome_empresa}" foi cadastrada e ativada com sucesso!', 'success')
     return redirect(url_for('main.optmiza_master'))
