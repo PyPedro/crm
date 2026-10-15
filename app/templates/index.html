@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM WhatsApp - Optmiza</title>
+    <title>CRM WhatsApp - {{ current_user.empresa.nome if current_user.is_authenticated and current_user.empresa else 'Optmiza' }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,12 +12,27 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
-                    colors: { brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' }, surface: '#F8FAFC' }
+                    colors: {
+                        brand: {
+                            50: 'color-mix(in srgb, var(--brand-color) 8%, white)',
+                            100: 'color-mix(in srgb, var(--brand-color) 18%, white)',
+                            200: 'color-mix(in srgb, var(--brand-color) 32%, white)',
+                            300: 'color-mix(in srgb, var(--brand-color) 50%, white)',
+                            500: 'var(--brand-color)',
+                            600: 'var(--brand-color)',
+                            700: 'color-mix(in srgb, var(--brand-color) 85%, black)',
+                            900: 'color-mix(in srgb, var(--brand-color) 65%, black)'
+                        },
+                        surface: '#F8FAFC'
+                    }
                 }
             }
         }
     </script>
     <style>
+        :root {
+            --brand-color: {{ (current_user.empresa.cor_primaria if current_user.is_authenticated and current_user.empresa and current_user.empresa.cor_primaria else '#2563eb') }};
+        }
         body { background-color: #F8FAFC; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -31,24 +46,33 @@
     <!-- ÁREA PRINCIPAL -->
     <div class="flex-1 flex flex-col h-full overflow-hidden relative">
         <header class="h-20 px-8 flex justify-between items-center bg-white/60 backdrop-blur-md border-b border-slate-200/60 z-10 flex-shrink-0">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Jornada do Cliente</h1>
-                <p class="text-sm text-slate-500 font-medium mt-0.5">Gestão de oportunidades Optmiza</p>
+            <div class="flex items-center gap-4">
+                {% if current_user.is_authenticated and current_user.empresa and current_user.empresa.logo_b64 %}
+                <div class="h-11 w-auto max-w-[140px] bg-white border border-slate-200/80 rounded-xl p-1.5 flex items-center justify-center shadow-sm">
+                    <img src="{{ current_user.empresa.logo_b64 }}" alt="Logo {{ current_user.empresa.nome }}" class="max-h-full max-w-full object-contain">
+                </div>
+                {% endif %}
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Jornada do Cliente</h1>
+                    <p class="text-sm text-slate-500 font-medium mt-0.5">
+                        Gestão de oportunidades {{ current_user.empresa.nome if current_user.is_authenticated and current_user.empresa else 'Optmiza' }}
+                    </p>
+                </div>
             </div>
             
             <div class="flex items-center gap-3">
-                <button type="button" onclick="abrirModalLead()" class="flex items-center gap-2 rounded-lg bg-[#16382e] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245642]">
+                <button type="button" onclick="abrirModalLead()" class="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 shadow-sm">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m-7-7h14"/></svg>
                     <span>Novo lead</span>
                 </button>
                 <div class="flex items-center bg-white border border-slate-200 rounded-full py-1.5 px-4 shadow-sm">
-                <div class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs mr-3">
-                    {{ current_user.username[0]|upper }}
-                </div>
-                <span class="text-sm font-semibold text-slate-700 mr-2">{{ current_user.username }}</span>
-                {% if current_user.is_admin %}
-                <span class="bg-slate-100 text-slate-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider">Admin</span>
-                {% endif %}
+                    <div class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs mr-3">
+                        {{ current_user.username[0]|upper }}
+                    </div>
+                    <span class="text-sm font-semibold text-slate-700 mr-2">{{ current_user.username }}</span>
+                    {% if current_user.is_admin %}
+                    <span class="bg-slate-100 text-slate-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider">Admin</span>
+                    {% endif %}
                 </div>
             </div>
         </header>
@@ -71,7 +95,7 @@
                         {% if current_user.is_admin or negocio.user_id == current_user.id or not negocio.user_id %}
                         
                         <div class="relative bg-white p-4 rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.06)] border border-slate-100 cursor-pointer hover:shadow-md hover:border-brand-200 transition-all group" 
-                                data-negocio-id="{{ negocio.id }}" data-pessoa-id="{{ negocio.pessoa.id }}" onclick="abrirChat({{ negocio.pessoa.id }}, '{{ negocio.pessoa.nome }}', '{{ negocio.pessoa.telefone }}')">
+                             data-negocio-id="{{ negocio.id }}" data-pessoa-id="{{ negocio.pessoa.id }}" onclick="abrirChat({{ negocio.pessoa.id }}, {{ negocio.pessoa.nome | tojson }}, {{ negocio.pessoa.telefone | tojson }})">
                             
                             {% if negocio.pessoa.qtd_nao_lidas > 0 %}
                             <span id="badge-{{ negocio.pessoa.id }}" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md border-2 border-white">{{ negocio.pessoa.qtd_nao_lidas }}</span>
@@ -84,7 +108,7 @@
                                     {% if negocio.pessoa.etiquetas %}
                                     <div class="mt-2 flex flex-wrap gap-1">
                                         {% for etiqueta in negocio.pessoa.etiquetas %}
-                                        <span class="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{{ etiqueta.nome }}</span>
+                                        <span class="rounded-md bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">{{ etiqueta.nome }}</span>
                                         {% endfor %}
                                     </div>
                                     {% endif %}
@@ -178,26 +202,26 @@
             <p class="mb-6 text-sm text-slate-500">O contato e a oportunidade serão adicionados ao funil.</p>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label class="text-xs font-semibold text-slate-600">Nome
-                    <input id="lead-nome" required maxlength="100" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                    <input id="lead-nome" required maxlength="100" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
                 </label>
                 <label class="text-xs font-semibold text-slate-600">Telefone / WhatsApp
-                    <input id="lead-telefone" required inputmode="tel" maxlength="24" placeholder="5511999999999" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                    <input id="lead-telefone" required inputmode="tel" maxlength="24" placeholder="5511999999999" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
                 </label>
                 <label class="text-xs font-semibold text-slate-600 sm:col-span-2">Oportunidade
-                    <input id="lead-titulo" maxlength="100" placeholder="Ex.: Plano anual" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                    <input id="lead-titulo" maxlength="100" placeholder="Ex.: Plano anual" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
                 </label>
                 <label class="text-xs font-semibold text-slate-600">Valor estimado
-                    <input id="lead-valor" type="number" min="0" step="0.01" value="0" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                    <input id="lead-valor" type="number" min="0" step="0.01" value="0" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
                 </label>
                 <label class="text-xs font-semibold text-slate-600">Etapa
-                    <select id="lead-etapa" class="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100">
+                    <select id="lead-etapa" class="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
                         {% for etapa in etapas %}<option value="{{ etapa.id }}">{{ etapa.nome }}</option>{% endfor %}
                     </select>
                 </label>
             </div>
             <div class="mt-7 flex justify-end gap-2">
                 <button type="button" onclick="fecharModalLead()" class="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">Cancelar</button>
-                <button id="salvar-lead-btn" type="submit" class="rounded-lg bg-[#16382e] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245642]">Cadastrar lead</button>
+                <button id="salvar-lead-btn" type="submit" class="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">Cadastrar lead</button>
             </div>
         </form>
     </div>
@@ -213,7 +237,7 @@
             <textarea id="prompt-ia-input" class="w-full h-64 bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-colors mb-6 font-mono text-slate-700 leading-relaxed resize-none"></textarea>
             <div class="flex justify-end space-x-3">
                 <button onclick="fecharConfigIA()" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors font-semibold text-sm">Cancelar</button>
-                <button onclick="salvarConfigIA(event)" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md shadow-brand-500/20 transition-all text-sm">Gravar Instruções</button>
+                <button onclick="salvarConfigIA(event)" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md transition-all text-sm">Gravar Instruções</button>
             </div>
         </div>
     </div>
@@ -252,7 +276,7 @@
                         <label for="novo-user-admin" class="text-xs font-semibold text-brand-700 cursor-pointer">Conceder permissões de Administrador</label>
                     </div>
                 </div>
-                <button onclick="gerarLinkConvite()" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-brand-500/20 transition-all flex items-center space-x-2">
+                <button onclick="gerarLinkConvite()" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition-all flex items-center space-x-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                     <span>Copiar Link</span>
                 </button>
@@ -315,7 +339,7 @@
 
         <div class="border-b border-slate-100 bg-white px-5 py-3">
             <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                <input type="checkbox" id="chat-ia-toggle" onchange="alternarAssistenteIA(this.checked)" class="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                <input type="checkbox" id="chat-ia-toggle" onchange="alternarAssistenteIA(this.checked)" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                 Assistente de IA ativo nesta conversa
             </label>
             <div id="chat-etiquetas" class="mt-3 flex flex-wrap gap-1.5"></div>
@@ -328,7 +352,7 @@
                 </button>
             </div>
             <div class="mt-2 flex gap-2">
-                <input id="nova-etiqueta-chat" maxlength="40" placeholder="Criar nova etiqueta" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-emerald-700">
+                <input id="nova-etiqueta-chat" maxlength="40" placeholder="Criar nova etiqueta" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-brand-600">
                 <button type="button" onclick="criarEtiquetaConversa()" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Criar</button>
             </div>
         </div>
@@ -535,8 +559,8 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;')
                 .replace(/\n/g, '<br>')
-                .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-                .replace(/_(.*?)_/g, '<em>$1</em>');
+                .replace(/\*(.*?)\*/g, '<strong>\$1</strong>')
+                .replace(/_(.*?)_/g, '<em>\$1</em>');
         }
 
         function criarElementoMensagem(msg) {
@@ -635,12 +659,12 @@
             container.replaceChildren();
             etiquetas.forEach(etiqueta => {
                 const chip = document.createElement('span');
-                chip.className = 'inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-900';
+                chip.className = 'inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[10px] font-semibold text-brand-900';
                 const nome = document.createElement('span');
                 nome.textContent = etiqueta.nome;
                 const remover = document.createElement('button');
                 remover.type = 'button';
-                remover.className = 'ml-1 text-emerald-700 hover:text-red-600';
+                remover.className = 'ml-1 text-brand-700 hover:text-red-600';
                 remover.title = `Remover etiqueta ${etiqueta.nome}`;
                 remover.setAttribute('aria-label', `Remover etiqueta ${etiqueta.nome}`);
                 remover.textContent = '×';
@@ -748,229 +772,4 @@
             let texto = input.value.trim();
             if ((!texto && !arquivoSelecionado) || !pessoaAtualId) return;
 
-            const usaAssinatura = document.getElementById('usar-assinatura').checked;
-            if (usaAssinatura && texto) { texto += `\n\n*Atendente: ${nomeOperadorAtual}*`; }
-            
-            const payload = { pessoa_id: pessoaAtualId, numero: telefoneAtual, texto: texto };
-            if (arquivoSelecionado) { payload.media = arquivoSelecionado.base64; payload.fileName = arquivoSelecionado.name; }
-            
-            input.value = ''; removerAnexo();
-            const pessoaId = pessoaAtualId;
-            const response = await fetch('/api/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (response.ok && pessoaAtualId === pessoaId) await consultarMensagensNovas();
-        }
-
-        // ==========================================
-        // 3. POLLING (ATUALIZAÇÃO EM TEMPO REAL)
-        // ==========================================
-        setInterval(async () => {
-            try {
-                const res = await fetch('/api/check_updates?t=' + new Date().getTime()); 
-                const dados = await res.json();
-                if (ultimaMensagemGlobalId === null) { ultimaMensagemGlobalId = dados.ultima_mensagem_id; return; }
-                if (dados.ultima_mensagem_id > ultimaMensagemGlobalId) {
-                    ultimaMensagemGlobalId = dados.ultima_mensagem_id;
-                    if (dados.tipo === 'inbound') { mostrarNotificacao(dados.remetente, dados.texto); }
-                    recarregarKanbanInvisivel();
-                }
-            } catch (erro) {}
-        }, 3000);
-
-        setInterval(consultarMensagensNovas, 2000);
-
-        function mostrarNotificacao(titulo, texto) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'bg-white text-slate-800 p-4 rounded-xl shadow-xl border border-slate-100 transform transition-all duration-300 translate-x-full flex items-start space-x-3 w-80 pointer-events-auto relative overflow-hidden';
-            toast.innerHTML = `<div class="absolute left-0 top-0 bottom-0 w-1 bg-brand-500"></div><div class="flex-1 ml-1"><h4 class="font-bold text-sm text-slate-800">${titulo}</h4><p class="text-xs mt-1 text-slate-500 font-medium">${texto.length > 60 ? texto.substring(0, 60) + '...' : texto}</p></div>`;
-            container.appendChild(toast);
-            setTimeout(() => toast.classList.remove('translate-x-full'), 100);
-            try { new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3').play(); } catch(e) {}
-            setTimeout(() => { toast.classList.add('translate-x-full'); setTimeout(() => toast.remove(), 300); }, 5000);
-        }
-
-        // ==========================================
-        // 4. EQUIPA E LINKS MÁGICOS
-        // ==========================================
-        async function carregarEquipa() {
-            const tbody = document.getElementById('lista-equipa');
-            try {
-                const res = await fetch('/api/usuarios');
-                const users = await res.json();
-                tbody.innerHTML = '';
-                
-                users.forEach(u => {
-                    const roleBadge = u.is_admin 
-                        ? '<span class="bg-brand-100 text-brand-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-md">Admin</span>' 
-                        : '<span class="bg-slate-100 text-slate-600 text-[10px] uppercase font-bold px-2 py-0.5 rounded-md">Operador</span>';
-                    
-                    const actions = u.username !== "{{ current_user.username }}"
-                        ? `<div class="flex justify-end space-x-2">
-                               <button onclick="gerarLinkReset(${u.id})" class="text-amber-600 hover:text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors" title="Link de Recuperação de Senha">Resetar</button>
-                               <button onclick="apagarUtilizador(${u.id})" class="text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Remover</button>
-                           </div>`
-                        : `<span class="text-slate-400 text-xs italic font-medium pr-2">A sua conta</span>`;
-
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-5 py-4 font-semibold text-slate-700">${u.username}</td>
-                            <td class="px-5 py-4">${roleBadge}</td>
-                            <td class="px-5 py-4">${actions}</td>
-                        </tr>
-                    `;
-                });
-            } catch (err) { tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-red-500 text-xs">Erro ao carregar equipa.</td></tr>'; }
-        }
-
-        function abrirModalEquipa() { document.getElementById('equipa-modal').classList.remove('hidden'); carregarEquipa(); }
-        function fecharModalEquipa() { document.getElementById('equipa-modal').classList.add('hidden'); window.location.reload(); }
-
-        async function gerarLinkConvite() {
-            const isAdmin = document.getElementById('novo-user-admin').checked;
-            try {
-                const res = await fetch('/api/invite', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({is_admin: isAdmin}) });
-                const data = await res.json();
-                navigator.clipboard.writeText(data.link);
-                mostrarNotificacao('Link Copiado!', 'O link de registo está na sua área de transferência. Envie-o ao novo membro.');
-                document.getElementById('novo-user-admin').checked = false;
-            } catch (e) { mostrarNotificacao('Erro', 'Falha ao gerar link.'); }
-        }
-
-        async function gerarLinkReset(userId) {
-            try {
-                const res = await fetch(`/api/usuarios/${userId}/reset_link`, {method: 'POST'});
-                const data = await res.json();
-                navigator.clipboard.writeText(data.link);
-                mostrarNotificacao('Link de Reset Copiado!', 'Envie este link temporário (1h) ao utilizador para ele redefinir a palavra-passe.');
-            } catch (e) { mostrarNotificacao('Erro', 'Falha ao gerar link.'); }
-        }
-
-        async function apagarUtilizador(id) {
-            if (!confirm('Remover definitivamente este membro? Os negócios em andamento voltarão para a piscina.')) return;
-            const res = await fetch(`/api/usuarios/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.erro) { mostrarNotificacao('Erro', data.erro); } else { mostrarNotificacao('Removido', 'A conta foi apagada.'); carregarEquipa(); }
-        }
-
-        // ==========================================
-        // 5. OUTROS MODAIS (QR CODE, IA, DASHBOARD E COLUNAS)
-        // ==========================================
-        async function carregarListaEtapas() {
-            const container = document.getElementById('lista-etapas');
-            try {
-                const res = await fetch('/api/etapas'); const etapas = await res.json();
-                container.innerHTML = '';
-                etapas.forEach(etapa => {
-                    container.innerHTML += `
-                        <div class="flex justify-between items-center bg-white border border-slate-100 p-3.5 rounded-xl shadow-sm">
-                            <input type="text" id="etapa-nome-${etapa.id}" value="${etapa.nome}" class="border-none bg-transparent font-bold text-slate-700 text-sm focus:ring-0 w-1/2">
-                            <div class="flex space-x-3 items-center">
-                                <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-md font-bold">${etapa.qtd_negocios} leads</span>
-                                <button onclick="renomearEtapa(${etapa.id})" class="text-brand-500 hover:text-brand-700 text-xs font-bold bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">Guardar</button>
-                                <button onclick="apagarEtapa(${etapa.id})" class="text-red-500 hover:text-red-700 text-xs font-bold bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors">✕</button>
-                            </div>
-                        </div>`;
-                });
-            } catch (err) { container.innerHTML = '<p class="text-red-500 text-sm text-center">Erro ao carregar.</p>'; }
-        }
-        function abrirModalFunil() { document.getElementById('funil-config-modal').classList.remove('hidden'); carregarListaEtapas(); }
-        function fecharModalFunil() { document.getElementById('funil-config-modal').classList.add('hidden'); window.location.reload(); }
-        
-        async function adicionarEtapa() {
-            const nome = document.getElementById('nova-etapa-input').value.trim(); if (!nome) return;
-            await fetch('/api/etapas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: nome }) });
-            document.getElementById('nova-etapa-input').value = ''; carregarListaEtapas();
-        }
-        async function renomearEtapa(id) {
-            const novoNome = document.getElementById(`etapa-nome-${id}`).value.trim(); if (!novoNome) return;
-            await fetch(`/api/etapas/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: novoNome }) });
-            mostrarNotificacao('Sucesso', 'Coluna renomeada.');
-        }
-        async function apagarEtapa(id) {
-            if (!confirm("Tem certeza que deseja apagar esta coluna?")) return;
-            const res = await fetch(`/api/etapas/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.erro) { mostrarNotificacao('Erro', data.erro); } else { carregarListaEtapas(); }
-        }
-
-        async function abrirConfigIA() {
-            document.getElementById('ia-modal').classList.remove('hidden');
-            document.getElementById('prompt-ia-input').value = 'A carregar...';
-            try {
-                const res = await fetch('/api/configuracoes'); const data = await res.json();
-                document.getElementById('prompt-ia-input').value = data.prompt_ia;
-            } catch (err) {}
-        }
-        function fecharConfigIA() { document.getElementById('ia-modal').classList.add('hidden'); }
-        async function salvarConfigIA(event) {
-            const novoPrompt = document.getElementById('prompt-ia-input').value;
-            const btn = event.target; btn.innerText = "A gravar...";
-            try {
-                await fetch('/api/configuracoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt_ia: novoPrompt }) });
-                mostrarNotificacao('Sucesso', 'Instruções atualizadas!'); fecharConfigIA();
-            } catch (err) {} finally { btn.innerText = "Gravar Instruções"; }
-        }
-
-        async function abrirDashboard() {
-            document.getElementById('dashboard-modal').classList.remove('hidden');
-            try {
-                const res = await fetch('/api/metrics'); const data = await res.json();
-                document.getElementById('dash-total').innerText = data.total_negocios;
-                document.getElementById('dash-conversao').innerText = data.taxa_conversao;
-                document.getElementById('dash-sla').innerText = data.sla_minutos;
-                
-                const funilContainer = document.getElementById('funil-container'); funilContainer.innerHTML = '';
-                if (data.funil.length === 0) { funilContainer.innerHTML = '<p class="text-sm text-slate-500">Sem dados no funil.</p>'; return; }
-                data.funil.forEach(etapa => {
-                    funilContainer.innerHTML += `
-                        <div>
-                            <div class="flex justify-between text-sm mb-2">
-                                <span class="font-bold text-slate-700">${etapa.nome}</span>
-                                <span class="text-slate-500 font-semibold">${etapa.quantidade} leads <span class="text-slate-400 ml-1">(${Math.round(etapa.porcentagem)}%)</span></span>
-                            </div>
-                            <div class="w-full bg-slate-200 rounded-full h-2.5">
-                                <div class="bg-brand-500 h-2.5 rounded-full" style="width: ${etapa.porcentagem}%"></div>
-                            </div>
-                        </div>`;
-                });
-            } catch (err) {}
-        }
-        function fecharDashboard() { document.getElementById('dashboard-modal').classList.add('hidden'); }
-
-        async function carregarQRCode() {
-            const container = document.getElementById('qr-container');
-            try {
-                const response = await fetch('/api/get_qr'); 
-                const data = await response.json();
-                if (data.status === 'connected') {
-                    let numeroDisplay = '';
-                    if (data.numero) {
-                        numeroDisplay = `
-                            <div class="bg-brand-50 border border-brand-100 text-brand-700 font-semibold px-4 py-2 rounded-xl mb-6 flex items-center space-x-2 shadow-sm">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg> 
-                                <span>+${data.numero}</span>
-                            </div>`;
-                    }
-                    container.innerHTML = `
-                        <div class="flex flex-col items-center py-4">
-                            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">✓</div>
-                            <p class="text-slate-800 font-bold text-lg mb-4">WhatsApp Conectado!</p>
-                            ${numeroDisplay}
-                            <button onclick="desconectarWhatsApp()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl font-semibold transition-colors text-sm shadow-sm">Desconectar Aparelho</button>
-                        </div>`;
-                    if (qrInterval) clearInterval(qrInterval);
-                } else if (data.status === 'qr' && data.qr_base64) {
-                    container.innerHTML = `<img src="${data.qr_base64}" alt="QR Code" class="w-56 h-56 mx-auto rounded-xl p-2 bg-white shadow-sm border border-slate-100"><p class="text-xs text-slate-400 mt-4 font-medium">Aponte a câmara do telemóvel.</p>`;
-                } else { container.innerHTML = `<p class="text-red-500 text-sm font-semibold">${data.erro || 'Falha ao carregar API'}</p>`; }
-            } catch (err) { container.innerHTML = `<p class="text-red-500 text-sm">Erro de comunicação.</p>`; }
-        }
-        
-        async function desconectarWhatsApp() {
-            document.getElementById('qr-container').innerHTML = '<p class="text-slate-500 text-sm">A desconectar...</p>';
-            try { await fetch('/api/disconnect', { method: 'POST' }); carregarQRCode(); qrInterval = setInterval(carregarQRCode, 10000); } catch (err) {}
-        }
-        function abrirModalQR() { document.getElementById('qr-modal').classList.remove('hidden'); document.getElementById('qr-container').innerHTML = '<p class="text-slate-400 text-sm">A carregar...</p>'; carregarQRCode(); qrInterval = setInterval(carregarQRCode, 10000); }
-        function fecharModalQR() { document.getElementById('qr-modal').classList.add('hidden'); if (qrInterval) clearInterval(qrInterval); }
-    </script>
-</body>
-</html>
+            const usaAssinatura = document.getElementById('
