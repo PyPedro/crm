@@ -25,10 +25,10 @@ class Empresa(db.Model):
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     is_ativa = db.Column(db.Boolean, default=False)
     
-    # Data de criação (Evita NotNullViolation)
+    # CORREÇÃO 1: Data de criação (Evita NotNullViolation)
     data_criacao = db.Column(db.DateTime(timezone=True), default=hora_atual_br, nullable=False)
     
-    # Configurações do Bot de Atendimento com valores padrão (Evita NotNullViolation)
+    # CORREÇÃO 2: Configurações do Bot de Atendimento com valores padrão
     usar_menu_inicial = db.Column(db.Boolean, default=False)
     mensagem_saudacao = db.Column(db.Text, nullable=False, default="Olá! Bem-vindo ao nosso atendimento. Como podemos ajudar hoje?")
     prompt_personalidade = db.Column(db.Text, nullable=False, default="Você é um assistente virtual prestativo. Responda de forma curta, direta e amigável.")
@@ -141,4 +141,6 @@ class Mensagem(db.Model):
 class Configuracao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresa.id'), nullable=False)
-    prompt_ia = db.Column(db.Text, nullable=True)
+    
+    # CORREÇÃO 3: Adicionado nullable=False e default="" para a coluna da IA extra
+    prompt_ia = db.Column(db.Text, nullable=False, default="")
