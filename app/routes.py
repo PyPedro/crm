@@ -37,12 +37,11 @@ def bloquear_empresa_suspensa():
     if not current_user.is_authenticated:
         return None
 
-    # Exceções para o Super Admin poder operar mesmo se a sua conta/empresa estiver suspensa
     if current_user.is_super_admin and request.endpoint in {
         'main.optmiza_master', 'main.toggle_empresa', 
         'main.admin_upload_logo_global', 'main.admin_apagar_logo_global',
         'main.admin_empresas_pendentes', 'main.admin_ativar_empresa', 'main.admin_nova_empresa',
-        'main.admin_gerar_convite_empresa', 'main.admin_config_empresa'
+        'main.admin_gerar_convite_empresa', 'main.admin_config_empresa', 'main.admin_branding_empresa'
     }:
         return None
 
@@ -85,6 +84,15 @@ def configurar_instancia_whatsapp(nome_empresa):
     resposta_webhook.raise_for_status()
     return instancia
 
+def gerar_username_unico(base_str):
+    limpo = re.sub(r'[^a-zA-Z0-9._]', '', base_str.lower())[:35] or 'usuario'
+    candidato = limpo
+    contador = 1
+    while User.query.filter_by(username=candidato).first():
+        candidato = f"{limpo}{contador}"
+        contador += 1
+    return candidato
+
 AUTH_HTML = """
 <!DOCTYPE html>
 <html lang="pt">
@@ -94,18 +102,47 @@ AUTH_HTML = """
     <title>{{ title }} - Optmiza</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        :root { --cor-primaria: {{ cor_primaria or '#2563eb' }}; }
+    </style>
 </head>
-<body class="bg-slate-50 h-screen flex flex-col items-center justify-center">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-[400px] border border-slate-100 mb-6">
-        <div class="w-12 h-12 bg-blue-600 rounded-xl mx-auto flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-md">O</div>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-[400px] border border-slate-100 mb-6">
+        {% if logo_b64 %}
+            <div class="h-16 w-32 mx-auto flex items-center justify-center mb-4">
+                <img src="{{ logo_b64 }}" alt="Logo" class="max-h-full max-w-full object-contain">
+            </div>
+        {% else %}
+            <div class="w-12 h-12 rounded-xl mx-auto flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-md" style="background-color: var(--cor-primaria);">O</div>
+        {% endif %}
+        
         <h2 class="text-2xl font-bold text-center text-slate-800 mb-2">{{ title }}</h2>
         <p class="text-sm text-slate-500 text-center mb-6">{{ subtitle }}</p>
         
         {% if erro %}
         <div class="bg-red-50 border border-red-100 text-red-600 p-3 rounded-xl text-sm mb-5 font-semibold text-center">{{ erro }}</div>
         {% endif %}
+
+        {% if action == 'invite' and token %}
+        <a href="{{ url_for('main.invite_google', token=token) }}" class="w-full bg-white hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-xl border border-slate-200 transition-all shadow-sm flex items-center justify-center gap-3 mb-5 text-sm">
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.3 0 6.08-1.09 8.1-2.96l-3.88-3.05c-1.1.74-2.5 1.18-4.22 1.18-3.25 0-6-2.2-6.98-5.15H1.01v3.14C3.02 21.15 7.21 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.02 14.02c-.25-.74-.39-1.54-.39-2.37s.14-1.63.39-2.37V6.14H1.01C.37 7.42 0 8.87 0 10.4s.37 2.98 1.01 4.26l4.01-3.14z"/>
+                <path fill="#EA4335" d="M12 4.75c1.8 0 3.41.62 4.68 1.84l3.5-3.5C18.07 1.19 15.3 0 12 0 7.21 0 3.02 2.85 1.01 6.84l4.01 3.14c.98-2.95 3.73-5.23 6.98-5.23z"/>
+            </svg>
+            Continuar com o Google (Gmail)
+        </a>
+
+        <div class="relative flex py-2 items-center mb-4">
+            <div class="flex-grow border-t border-slate-200"></div>
+            <span class="flex-shrink mx-4 text-slate-400 text-xs font-semibold uppercase">ou com utilizador</span>
+            <div class="flex-grow border-t border-slate-200"></div>
+        </div>
+        {% endif %}
         
+        {% if action in ['invite', 'reset'] %}
         <form method="POST" class="space-y-4">
             {% if action == 'invite' %}
             <div>
@@ -119,10 +156,11 @@ AUTH_HTML = """
                 <input type="password" name="password" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
             </div>
             
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] mt-2">
+            <button type="submit" class="w-full text-white font-bold py-3.5 rounded-xl transition-all shadow-md hover:opacity-95 mt-2" style="background-color: var(--cor-primaria);">
                 {{ btn_text }}
             </button>
         </form>
+        {% endif %}
     </div>
     
     <p class="text-slate-400 text-[10px] tracking-wide text-center">
@@ -156,10 +194,7 @@ def register():
     db.session.flush()
     db.session.add(User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=True))
     db.session.add_all([Etapa(empresa_id=empresa.id, nome=nome) for nome in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')])
-    
-    # CORREÇÃO: Passando prompt_ia="" explicitamente
     db.session.add(Configuracao(empresa_id=empresa.id, prompt_ia=""))
-    
     db.session.commit()
     flash('Cadastro realizado! A sua conta passará por uma análise e será ativada em breve pela nossa equipa.', 'success')
     return redirect(url_for('main.login'))
@@ -193,6 +228,21 @@ def login_google():
     callback_url = current_app.config.get('GOOGLE_REDIRECT_URI') or url_for('main.authorize_google', _external=True)
     return oauth.google.authorize_redirect(callback_url)
 
+@bp.route('/invite/<token>/google')
+def invite_google(token):
+    try:
+        data = get_serializer().loads(token, max_age=86400)
+        if data.get('action') != 'invite':
+            raise ValueError
+    except Exception:
+        return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="Este link expirou ou é inválido.", erro="Solicite um novo link.", action="error")
+
+    session['invite_token_google'] = token
+    if not current_app.config.get('GOOGLE_CLIENT_ID') or not current_app.config.get('GOOGLE_CLIENT_SECRET'):
+        return redirect(url_for('main.processar_convite', token=token))
+    callback_url = current_app.config.get('GOOGLE_REDIRECT_URI') or url_for('main.authorize_google', _external=True)
+    return oauth.google.authorize_redirect(callback_url)
+
 @bp.route('/authorize/google')
 def authorize_google():
     try:
@@ -203,20 +253,54 @@ def authorize_google():
 
     email = (perfil.get('email') or '').strip().lower()
     google_id = perfil.get('sub')
+    nome_google = (perfil.get('name') or email.split('@')[0]).strip()
     if not email or not google_id or not perfil.get('email_verified'):
         return redirect(url_for('main.login', msg='O Google não confirmou um endereço de e-mail válido.'))
 
+    # --- FLUXO 1: VEIO DE UM LINK DE CONVITE ---
+    invite_token = session.pop('invite_token_google', None)
+    if invite_token:
+        try:
+            data = get_serializer().loads(invite_token, max_age=86400)
+            empresa = db.session.get(Empresa, data.get('empresa_id'))
+            if empresa:
+                user = User.query.filter((User.email == email) | (User.google_id == google_id)).first()
+                if not user:
+                    novo_username = gerar_username_unico(nome_google or email.split('@')[0])
+                    user = User(
+                        empresa_id=empresa.id,
+                        username=novo_username,
+                        email=email,
+                        google_id=google_id,
+                        password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+                        is_admin=data.get('is_admin', True)
+                    )
+                    db.session.add(user)
+                else:
+                    user.google_id = google_id
+                    if not user.empresa_id:
+                        user.empresa_id = empresa.id
+                        user.is_admin = data.get('is_admin', True)
+                db.session.commit()
+                login_user(user)
+                return redirect(url_for('main.index'))
+        except Exception:
+            flash('O link de convite expirou ou é inválido.', 'error')
+            return redirect(url_for('main.login'))
+
+    # --- FLUXO 2: LOGIN NORMAL COM GOOGLE ---
     user = User.query.filter_by(email=email).first()
-    if not user: user = User.query.filter_by(google_id=google_id).first()
+    if not user:
+        user = User.query.filter_by(google_id=google_id).first()
     
     if user:
         if user.google_id and user.google_id != google_id:
             return redirect(url_for('main.login', msg='Este e-mail está associado a outra conta Google.'))
-        if not user.empresa:
+        if not user.empresa and not user.is_super_admin:
             session['registro_google_email'] = email
             session['registro_google_google_id'] = google_id
             return redirect(url_for('main.completar_cadastro'))
-        if not user.empresa.is_ativa:
+        if user.empresa and not user.empresa.is_ativa and not user.is_super_admin:
             flash('Conta pendente de aprovação do administrador', 'warning')
             return redirect(url_for('main.login'))
         if not user.google_id:
@@ -277,10 +361,7 @@ def completar_cadastro():
         db.session.add(User(empresa_id=empresa.id, username=nome_utilizador, email=email, google_id=google_id, password_hash=generate_password_hash(secrets.token_urlsafe(32)), is_admin=True))
         
     db.session.add_all([Etapa(empresa_id=empresa.id, nome=etapa) for etapa in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')])
-    
-    # CORREÇÃO: Passando prompt_ia="" explicitamente
     db.session.add(Configuracao(empresa_id=empresa.id, prompt_ia=""))
-    
     db.session.commit()
     session.pop('registro_google_email', None)
     session.pop('registro_google_google_id', None)
@@ -349,8 +430,6 @@ def admin_config_empresa(id):
     empresa = db.session.get(Empresa, id)
     if not empresa: return jsonify({"erro": "Empresa não encontrada"}), 404
     
-    config = Configuracao.query.filter_by(empresa_id=id).first()
-    
     if request.method == 'GET':
         return jsonify({
             "tom_resposta": empresa.tom_resposta or 'Profissional',
@@ -366,6 +445,35 @@ def admin_config_empresa(id):
     empresa.prompt_personalidade = dados.get('prompt_personalidade', empresa.prompt_personalidade)
     db.session.commit()
     return jsonify({"status": "sucesso"})
+
+# --- NOVA ROTA: PERSONALIZAÇÃO VISUAL (LOGO E CORES DO CLIENTE) ---
+@bp.route('/optmiza-master/empresa/<int:id>/branding', methods=['POST'])
+@login_required
+def admin_branding_empresa(id):
+    if not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
+
+    empresa = db.session.get(Empresa, id)
+    if not empresa:
+        flash('Empresa não encontrada.', 'error')
+        return redirect(url_for('main.optmiza_master'))
+
+    cor_primaria = (request.form.get('cor_primaria') or '').strip()
+    if cor_primaria:
+        empresa.cor_primaria = cor_primaria
+
+    file = request.files.get('logo')
+    if file and file.filename:
+        encoded_string = base64.b64encode(file.read()).decode('utf-8')
+        mimetype = file.mimetype or 'image/png'
+        empresa.logo_b64 = f"data:{mimetype};base64,{encoded_string}"
+
+    if request.form.get('remover_logo') == '1':
+        empresa.logo_b64 = ""
+
+    db.session.commit()
+    flash(f'Identidade visual da empresa "{empresa.nome}" atualizada com sucesso!', 'success')
+    return redirect(url_for('main.optmiza_master'))
 
 # --- ROTAS DE LOGÓTIPOS GLOBAIS ---
 @bp.route('/optmiza-master/logos', methods=['POST'])
@@ -404,6 +512,7 @@ def admin_apagar_logo_global(id):
         flash('Logótipo removido da biblioteca.', 'success')
     return redirect(url_for('main.optmiza_master'))
 
+# --- CRIAÇÃO DE EMPRESA SEM PRECISAR DE USUÁRIO E SENHA ---
 @bp.route('/optmiza-master/empresa/nova', methods=['POST'])
 @login_required
 def admin_nova_empresa():
@@ -417,15 +526,10 @@ def admin_nova_empresa():
         return redirect(url_for('main.optmiza_master'))
 
     nome_empresa = (request.form.get('nome_empresa') or '').strip()
-    username = (request.form.get('username') or '').strip()
-    password = request.form.get('password') or ''
+    cor_primaria = (request.form.get('cor_primaria') or '#2563eb').strip()
 
-    if not nome_empresa or not username or not password:
-        flash('Preencha todos os campos do formulário.', 'error')
-        return redirect(url_for('main.optmiza_master'))
-
-    if User.query.filter_by(username=username).first():
-        flash('Erro: Este nome de utilizador (admin) já está em uso.', 'error')
+    if not nome_empresa:
+        flash('Informe o nome da empresa.', 'error')
         return redirect(url_for('main.optmiza_master'))
 
     try:
@@ -434,19 +538,28 @@ def admin_nova_empresa():
         flash(f'Erro ao conectar à Evolution API: {str(e)}', 'error')
         return redirect(url_for('main.optmiza_master'))
 
-    empresa = Empresa(nome=nome_empresa, instancia_whatsapp=instancia, is_ativa=True)
+    logo_b64_str = ""
+    file = request.files.get('logo')
+    if file and file.filename:
+        encoded_string = base64.b64encode(file.read()).decode('utf-8')
+        mimetype = file.mimetype or 'image/png'
+        logo_b64_str = f"data:{mimetype};base64,{encoded_string}"
+
+    empresa = Empresa(
+        nome=nome_empresa,
+        instancia_whatsapp=instancia,
+        is_ativa=True,
+        cor_primaria=cor_primaria,
+        logo_b64=logo_b64_str
+    )
     db.session.add(empresa)
     db.session.flush()
 
-    admin_user = User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=True)
-    db.session.add(admin_user)
     db.session.add_all([Etapa(empresa_id=empresa.id, nome=nome) for nome in ('Qualificação', 'Contato Feito', 'Proposta Enviada', 'Fechamento')])
-    
-    # CORREÇÃO: Passando prompt_ia="" explicitamente
     db.session.add(Configuracao(empresa_id=empresa.id, prompt_ia=""))
-    
     db.session.commit()
-    flash(f'A empresa "{nome_empresa}" foi cadastrada e ativada com sucesso!', 'success')
+
+    flash(f'Empresa "{nome_empresa}" criada! Clique no botão "Convite" na linha dela para copiar o link de acesso do cliente.', 'success')
     return redirect(url_for('main.optmiza_master'))
 
 @bp.route('/admin/empresas/pendentes', methods=['GET'])
@@ -484,17 +597,32 @@ def processar_convite(token):
     try:
         data = get_serializer().loads(token, max_age=86400)
         if data.get('action') != 'invite': raise ValueError
-    except: return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="Este link expirou ou é inválido.", erro="Solicite um novo link.")
+    except:
+        return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="Este link expirou ou é inválido.", erro="Solicite um novo link.", action="error")
+
+    empresa = db.session.get(Empresa, data.get('empresa_id'))
+    if not empresa:
+        return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="A empresa deste convite não existe.", erro="Solicite novo link.", action="error"), 404
 
     if request.method == 'POST':
-        username, password = request.form.get('username'), request.form.get('password')
-        if User.query.filter_by(username=username).first(): return render_template_string(AUTH_HTML, title="Criar Conta", subtitle="Junte-se à equipa Optmiza", action="invite", btn_text="Concluir Registo", erro="Utilizador já em uso.")
-        empresa = db.session.get(Empresa, data.get('empresa_id'))
-        if not empresa: return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="A empresa deste convite não existe.", erro="Solicite novo link."), 404
-        db.session.add(User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=data['is_admin']))
+        username, password = (request.form.get('username') or '').strip(), request.form.get('password') or ''
+        if User.query.filter_by(username=username).first():
+            return render_template_string(
+                AUTH_HTML, title=f"Entrar em {empresa.nome}", subtitle="Crie o seu acesso ou entre com o Google",
+                action="invite", btn_text="Concluir Registo", erro="Este nome de utilizador já está em uso.",
+                token=token, logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria
+            )
+        novo_user = User(empresa_id=empresa.id, username=username, password_hash=generate_password_hash(password), is_admin=data.get('is_admin', True))
+        db.session.add(novo_user)
         db.session.commit()
-        return redirect(url_for('main.login', msg="Conta criada! Já pode fazer login."))
-    return render_template_string(AUTH_HTML, title="Criar Conta", subtitle="Foi convidado para a equipa Optmiza", action="invite", btn_text="Concluir Registo")
+        login_user(novo_user)
+        return redirect(url_for('main.index'))
+
+    return render_template_string(
+        AUTH_HTML, title=f"Entrar em {empresa.nome}", subtitle="Crie o seu acesso na plataforma",
+        action="invite", btn_text="Concluir Registo", token=token,
+        logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria
+    )
 
 @bp.route('/api/usuarios/<int:id>/reset_link', methods=['POST'])
 @login_required
@@ -510,10 +638,10 @@ def processar_reset(token):
     try:
         data = get_serializer().loads(token, max_age=3600)
         if data.get('action') != 'reset': raise ValueError
-    except: return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="Este link de segurança expirou.", erro="Solicite novo reset.")
+    except: return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="Este link de segurança expirou.", erro="Solicite novo reset.", action="error")
 
     user = db.session.get(User, data['user_id'])
-    if not user: return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="A conta não foi encontrada.", erro="Solicite novo reset."), 404
+    if not user: return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="A conta não foi encontrada.", erro="Solicite novo reset.", action="error"), 404
     if request.method == 'POST':
         user.password_hash = generate_password_hash(request.form.get('password'))
         db.session.commit()
@@ -673,7 +801,13 @@ def editar_etapa(id):
 @bp.route('/')
 @login_required
 def index():
-    return render_template('index.html', etapas=Etapa.query.filter_by(empresa_id=current_user.empresa_id).all(), users=User.query.filter_by(empresa_id=current_user.empresa_id).all() if current_user.is_admin else [])
+    empresa = db.session.get(Empresa, current_user.empresa_id) if current_user.empresa_id else None
+    return render_template(
+        'index.html',
+        empresa=empresa,
+        etapas=Etapa.query.filter_by(empresa_id=current_user.empresa_id).all(),
+        users=User.query.filter_by(empresa_id=current_user.empresa_id).all() if current_user.is_admin else []
+    )
 
 @bp.route('/api/leads', methods=['POST'])
 @login_required
