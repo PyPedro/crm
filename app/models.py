@@ -25,6 +25,9 @@ class Empresa(db.Model):
     instancia_whatsapp = db.Column(db.String(100), unique=True, nullable=False)
     is_ativa = db.Column(db.Boolean, default=False)
     
+    # CORREÇÃO: Coluna adicionada para evitar erro de NullViolation no banco de dados
+    data_criacao = db.Column(db.DateTime(timezone=True), default=hora_atual_br, nullable=False)
+    
     # Configurações do Bot de Atendimento
     usar_menu_inicial = db.Column(db.Boolean, default=False)
     mensagem_saudacao = db.Column(db.Text, nullable=True)
@@ -32,7 +35,7 @@ class Empresa(db.Model):
     tom_resposta = db.Column(db.String(20), nullable=True)
     mensagem_transbordo = db.Column(db.Text, nullable=True)
     
-    # Mantido apenas para retrocompatibilidade, mas não mais usado no Master
+    # Coluna legada
     logo_b64 = db.Column(db.Text, nullable=True)
 
     # Relacionamentos
