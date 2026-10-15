@@ -37,10 +37,12 @@ def bloquear_empresa_suspensa():
     if not current_user.is_authenticated:
         return None
 
+    # Exceções para o Super Admin poder operar mesmo se a sua conta/empresa estiver suspensa
     if current_user.is_super_admin and request.endpoint in {
         'main.optmiza_master', 'main.toggle_empresa', 
         'main.admin_upload_logo_global', 'main.admin_apagar_logo_global',
-        'main.admin_empresas_pendentes', 'main.admin_ativar_empresa', 'main.admin_nova_empresa'
+        'main.admin_empresas_pendentes', 'main.admin_ativar_empresa', 'main.admin_nova_empresa',
+        'main.admin_gerar_convite_empresa', 'main.admin_config_empresa'
     }:
         return None
 
@@ -322,6 +324,42 @@ def toggle_empresa(id):
         empresa.is_ativa = not empresa.is_ativa
         db.session.commit()
     return redirect(url_for('main.optmiza_master'))
+
+# --- ROTAS DE GESTÃO DIRETA (SUPER ADMIN) ---
+@bp.route('/optmiza-master/empresa/<int:id>/invite', methods=['POST'])
+@login_required
+def admin_gerar_convite_empresa(id):
+    if not current_user.is_super_admin: return jsonify({"erro": "Acesso negado"}), 403
+    empresa = db.session.get(Empresa, id)
+    if not empresa: return jsonify({"erro": "Empresa não encontrada"}), 404
+    
+    token = get_serializer().dumps({"is_admin": True, "empresa_id": empresa.id, "action": "invite"})
+    return jsonify({"link": url_for('main.processar_convite', token=token, _external=True)})
+
+@bp.route('/optmiza-master/empresa/<int:id>/config', methods=['GET', 'POST'])
+@login_required
+def admin_config_empresa(id):
+    if not current_user.is_super_admin: return jsonify({"erro": "Acesso negado"}), 403
+    empresa = db.session.get(Empresa, id)
+    if not empresa: return jsonify({"erro": "Empresa não encontrada"}), 404
+    
+    config = Configuracao.query.filter_by(empresa_id=id).first()
+    
+    if request.method == 'GET':
+        return jsonify({
+            "tom_resposta": empresa.tom_resposta or 'Profissional',
+            "mensagem_saudacao": empresa.mensagem_saudacao or '',
+            "mensagem_transbordo": empresa.mensagem_transbordo or '',
+            "prompt_personalidade": empresa.prompt_personalidade or '',
+        })
+        
+    dados = request.json
+    empresa.tom_resposta = dados.get('tom_resposta', empresa.tom_resposta)
+    empresa.mensagem_saudacao = dados.get('mensagem_saudacao', empresa.mensagem_saudacao)
+    empresa.mensagem_transbordo = dados.get('mensagem_transbordo', empresa.mensagem_transbordo)
+    empresa.prompt_personalidade = dados.get('prompt_personalidade', empresa.prompt_personalidade)
+    db.session.commit()
+    return jsonify({"status": "sucesso"})
 
 # --- ROTAS DE LOGÓTIPOS GLOBAIS ---
 @bp.route('/optmiza-master/logos', methods=['POST'])
