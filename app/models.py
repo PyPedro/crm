@@ -31,6 +31,7 @@ class Empresa(db.Model):
     # Personalização Visual (White-label do Terminal do Cliente)
     logo_b64 = db.Column(db.Text, nullable=True, default="")
     cor_primaria = db.Column(db.String(20), nullable=True, default="#2563eb")
+    cor_fundo = db.Column(db.String(20), nullable=True, default="#F8FAFC")
 
     # Relacionamentos
     users = db.relationship('User', backref='empresa', lazy=True)
