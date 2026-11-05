@@ -544,15 +544,30 @@ def _processar_payload(payload):
     ))
     db.session.commit()
 
+    if pessoa.status_atendimento == 'humano':
+        return 'human'
+
+    # Respostas configuradas são determinísticas e não dependem de serviços de IA.
+    regras = RespostaAutomatica.query.filter_by(
+        empresa_id=empresa.id
+    ).order_by(RespostaAutomatica.id).all()
+    eh_primeira_interacao = eh_novo_contato or atendimento_reaberto
+    regra_direta = _buscar_melhor_faq(regras, texto_recebido)
+    if regra_direta:
+        _simular_digitacao(instancia, telefone, 1.8)
+        resposta_pronta = _personalizar_mensagem(regra_direta.resposta, empresa, pessoa)
+        if eh_primeira_interacao and empresa.mensagem_saudacao:
+            saudacao = _personalizar_mensagem(empresa.mensagem_saudacao, empresa, pessoa)
+            resposta_pronta = f'{saudacao}\n\n{resposta_pronta}'
+        _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, resposta_pronta)
+        return 'faq_simulated_replied'
+
     if (atendimento_reaberto or eh_novo_contato) and empresa.usar_menu_inicial:
         _simular_digitacao(instancia, telefone, 1.2)
         _enviar_resposta(
             empresa.id, pessoa.id, telefone, instancia, _montar_texto_menu(empresa, pessoa)
         )
         return 'menu_sent'
-
-    if pessoa.status_atendimento == 'humano':
-        return 'human'
 
     if pessoa.status_atendimento == 'menu':
         etapa = None
@@ -580,23 +595,8 @@ def _processar_payload(payload):
     if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
         return 'ignored'
 
-    # Carrega todas as Perguntas e Respostas cadastradas para esta empresa
-    regras = RespostaAutomatica.query.filter_by(empresa_id=empresa.id).order_by(RespostaAutomatica.id).all()
-    eh_primeira_interacao = eh_novo_contato or atendimento_reaberto
-
     # Simula digitação humana no WhatsApp ("Digitando...")
     _simular_digitacao(instancia, telefone, 1.8)
-
-    # PRIORIDADE 1: Se a mensagem do cliente bate com alguma Pergunta/Resposta cadastrada,
-    # o próprio sistema já responde instantaneamente de forma humanizada (sem depender da IA!)
-    regra_direta = _buscar_melhor_faq(regras, texto_recebido)
-    if regra_direta:
-        resposta_pronta = _personalizar_mensagem(regra_direta.resposta, empresa, pessoa)
-        if eh_primeira_interacao and empresa.mensagem_saudacao:
-            saudacao = _personalizar_mensagem(empresa.mensagem_saudacao, empresa, pessoa)
-            resposta_pronta = f'{saudacao}\n\n{resposta_pronta}'
-        _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, resposta_pronta)
-        return 'faq_simulated_replied'
 
     # PRIORIDADE 2: Se for a primeira mensagem e for apenas uma saudação ("Oi", "Bom dia"),
     # envia a Primeira Mensagem (Saudação) configurada na empresa sem gastar API nem correr risco de erro
