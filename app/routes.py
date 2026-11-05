@@ -478,18 +478,29 @@ def admin_config_empresa(id):
     empresa.mensagem_transbordo = dados.get('mensagem_transbordo', empresa.mensagem_transbordo)
     empresa.prompt_personalidade = dados.get('prompt_personalidade', empresa.prompt_personalidade)
 
-    # Atualiza as Perguntas e Respostas da empresa na tabela RespostaAutomatica
     if 'faqs' in dados:
+        faqs = dados.get('faqs') or []
+        if not isinstance(faqs, list):
+            return jsonify({"erro": "A lista de FAQs é inválida"}), 400
+
+        novas_regras = []
+        for item in faqs:
+            if not isinstance(item, dict):
+                return jsonify({"erro": "Uma FAQ é inválida"}), 400
+            pergunta = item.get('pergunta')
+            resposta = item.get('resposta')
+            if isinstance(pergunta, str) and isinstance(resposta, str):
+                pergunta = pergunta.strip()
+                resposta = resposta.strip()
+                if pergunta and resposta:
+                    novas_regras.append(RespostaAutomatica(
+                        empresa_id=empresa.id,
+                        palavra_chave=pergunta,
+                        resposta=resposta
+                    ))
+
         RespostaAutomatica.query.filter_by(empresa_id=empresa.id).delete()
-        for item in dados.get('faqs') or []:
-            pergunta = (item.get('pergunta') or '').strip()
-            resposta = (item.get('resposta') or '').strip()
-            if pergunta and resposta:
-                db.session.add(RespostaAutomatica(
-                    empresa_id=empresa.id,
-                    palavra_chave=pergunta,
-                    resposta=resposta
-                ))
+        db.session.add_all(novas_regras)
 
     db.session.commit()
     return jsonify({"status": "sucesso"})
