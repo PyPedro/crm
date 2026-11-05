@@ -32,13 +32,14 @@ from app.tasks import processar_mensagem_whatsapp
 
 bp = Blueprint('main', __name__)
 
+
 @bp.before_app_request
 def bloquear_empresa_suspensa():
     if not current_user.is_authenticated:
         return None
 
     if current_user.is_super_admin and request.endpoint in {
-        'main.optmiza_master', 'main.toggle_empresa', 
+        'main.optmiza_master', 'main.toggle_empresa',
         'main.admin_upload_logo_global', 'main.admin_apagar_logo_global',
         'main.admin_empresas_pendentes', 'main.admin_ativar_empresa', 'main.admin_nova_empresa',
         'main.admin_gerar_convite_empresa', 'main.admin_config_empresa', 'main.admin_branding_empresa'
@@ -51,16 +52,20 @@ def bloquear_empresa_suspensa():
 
     return None
 
+
 def get_serializer():
     return URLSafeTimedSerializer(current_app.config.get('SECRET_KEY', 'optmiza-secure-key-2026'))
+
 
 def slug_instancia(nome_empresa):
     normalizado = unicodedata.normalize('NFKD', nome_empresa).encode('ascii', 'ignore').decode('ascii')
     base = re.sub(r'[^a-zA-Z0-9]+', '-', normalizado).strip('-').lower() or 'empresa'
     return f"{base[:80]}-{secrets.token_hex(4)}"
 
+
 def evolution_headers():
     return {"apikey": current_app.config['EVOLUTION_API_KEY']}
+
 
 def configurar_instancia_whatsapp(nome_empresa):
     if not current_app.config.get('EVOLUTION_API_KEY'):
@@ -84,6 +89,7 @@ def configurar_instancia_whatsapp(nome_empresa):
     resposta_webhook.raise_for_status()
     return instancia
 
+
 def gerar_username_unico(base_str):
     limpo = re.sub(r'[^a-zA-Z0-9._]', '', base_str.lower())[:35] or 'usuario'
     candidato = limpo
@@ -92,6 +98,7 @@ def gerar_username_unico(base_str):
         candidato = f"{limpo}{contador}"
         contador += 1
     return candidato
+
 
 AUTH_HTML = """
 <!DOCTYPE html>
@@ -180,6 +187,7 @@ AUTH_HTML = """
 </html>
 """
 
+
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'GET':
@@ -231,12 +239,14 @@ def login():
     logos_globais = LogotipoGlobal.query.all()
     return render_template('login.html', msg=msg_sucesso, empresas=logos_globais)
 
+
 @bp.route('/login/google')
 def login_google():
     if not current_app.config.get('GOOGLE_CLIENT_ID') or not current_app.config.get('GOOGLE_CLIENT_SECRET'):
         return redirect(url_for('main.login', msg='O acesso com Google ainda não está configurado.'))
     callback_url = current_app.config.get('GOOGLE_REDIRECT_URI') or url_for('main.authorize_google', _external=True)
     return oauth.google.authorize_redirect(callback_url)
+
 
 @bp.route('/invite/<token>/google')
 def invite_google(token):
@@ -252,6 +262,7 @@ def invite_google(token):
         return redirect(url_for('main.processar_convite', token=token))
     callback_url = current_app.config.get('GOOGLE_REDIRECT_URI') or url_for('main.authorize_google', _external=True)
     return oauth.google.authorize_redirect(callback_url)
+
 
 @bp.route('/authorize/google')
 def authorize_google():
@@ -324,6 +335,7 @@ def authorize_google():
     session['registro_google_google_id'] = google_id
     return redirect(url_for('main.completar_cadastro'))
 
+
 @bp.route('/completar_cadastro', methods=['GET', 'POST'])
 def completar_cadastro():
     email = session.get('registro_google_email')
@@ -378,11 +390,13 @@ def completar_cadastro():
     flash('Cadastro recebido! Aguarde a aprovação do administrador.', 'warning')
     return redirect(url_for('main.login'))
 
+
 @bp.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('main.login'))
+
 
 # --- PAINEL DO SUPER ADMIN (MASTER) ---
 @bp.route('/optmiza-master', methods=['GET'])
@@ -407,6 +421,7 @@ def optmiza_master():
         csrf_token=csrf_token,
     )
 
+
 @bp.route('/optmiza-master/empresa/<int:id>/toggle', methods=['POST'])
 def toggle_empresa(id):
     if not current_user.is_authenticated or not current_user.is_super_admin:
@@ -422,39 +437,63 @@ def toggle_empresa(id):
         db.session.commit()
     return redirect(url_for('main.optmiza_master'))
 
+
 # --- ROTAS DE GESTÃO DIRETA (SUPER ADMIN) ---
 @bp.route('/optmiza-master/empresa/<int:id>/invite', methods=['POST'])
 @login_required
 def admin_gerar_convite_empresa(id):
-    if not current_user.is_super_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_super_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     empresa = db.session.get(Empresa, id)
-    if not empresa: return jsonify({"erro": "Empresa não encontrada"}), 404
+    if not empresa:
+        return jsonify({"erro": "Empresa não encontrada"}), 404
     
     token = get_serializer().dumps({"is_admin": True, "empresa_id": empresa.id, "action": "invite"})
     return jsonify({"link": url_for('main.processar_convite', token=token, _external=True)})
 
+
 @bp.route('/optmiza-master/empresa/<int:id>/config', methods=['GET', 'POST'])
 @login_required
 def admin_config_empresa(id):
-    if not current_user.is_super_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_super_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     empresa = db.session.get(Empresa, id)
-    if not empresa: return jsonify({"erro": "Empresa não encontrada"}), 404
+    if not empresa:
+        return jsonify({"erro": "Empresa não encontrada"}), 404
     
     if request.method == 'GET':
+        regras = RespostaAutomatica.query.filter_by(empresa_id=empresa.id).order_by(RespostaAutomatica.id).all()
+        faqs_lista = [{"id": r.id, "pergunta": r.palavra_chave, "resposta": r.resposta} for r in regras]
         return jsonify({
             "tom_resposta": empresa.tom_resposta or 'Profissional',
             "mensagem_saudacao": empresa.mensagem_saudacao or '',
             "mensagem_transbordo": empresa.mensagem_transbordo or '',
             "prompt_personalidade": empresa.prompt_personalidade or '',
+            "faqs": faqs_lista,
         })
         
-    dados = request.json
+    dados = request.get_json(silent=True) or {}
     empresa.tom_resposta = dados.get('tom_resposta', empresa.tom_resposta)
     empresa.mensagem_saudacao = dados.get('mensagem_saudacao', empresa.mensagem_saudacao)
     empresa.mensagem_transbordo = dados.get('mensagem_transbordo', empresa.mensagem_transbordo)
     empresa.prompt_personalidade = dados.get('prompt_personalidade', empresa.prompt_personalidade)
+
+    # Atualiza as Perguntas e Respostas da empresa na tabela RespostaAutomatica
+    if 'faqs' in dados:
+        RespostaAutomatica.query.filter_by(empresa_id=empresa.id).delete()
+        for item in dados.get('faqs') or []:
+            pergunta = (item.get('pergunta') or '').strip()
+            resposta = (item.get('resposta') or '').strip()
+            if pergunta and resposta:
+                db.session.add(RespostaAutomatica(
+                    empresa_id=empresa.id,
+                    palavra_chave=pergunta,
+                    resposta=resposta
+                ))
+
     db.session.commit()
     return jsonify({"status": "sucesso"})
+
 
 # --- PERSONALIZAÇÃO VISUAL (LOGO, COR PRIMÁRIA E IMAGEM DE FUNDO DO TERMINAL) ---
 @bp.route('/optmiza-master/empresa/<int:id>/branding', methods=['POST'])
@@ -496,6 +535,7 @@ def admin_branding_empresa(id):
     flash(f'Identidade visual e imagem de fundo da empresa "{empresa.nome}" atualizadas com sucesso!', 'success')
     return redirect(url_for('main.optmiza_master'))
 
+
 # --- ROTAS DE LOGÓTIPOS GLOBAIS ---
 @bp.route('/optmiza-master/logos', methods=['POST'])
 @login_required
@@ -520,6 +560,7 @@ def admin_upload_logo_global():
         
     return redirect(url_for('main.optmiza_master'))
 
+
 @bp.route('/optmiza-master/logos/<int:id>/apagar', methods=['POST'])
 @login_required
 def admin_apagar_logo_global(id):
@@ -532,6 +573,7 @@ def admin_apagar_logo_global(id):
         db.session.commit()
         flash('Logótipo removido da biblioteca.', 'success')
     return redirect(url_for('main.optmiza_master'))
+
 
 # --- CRIAÇÃO DE EMPRESA SEM PRECISAR DE USUÁRIO E SENHA ---
 @bp.route('/optmiza-master/empresa/nova', methods=['POST'])
@@ -591,21 +633,26 @@ def admin_nova_empresa():
     flash(f'Empresa "{nome_empresa}" criada! Clique no botão "Convite" na linha dela para copiar o link de acesso do cliente.', 'success')
     return redirect(url_for('main.optmiza_master'))
 
+
 @bp.route('/admin/empresas/pendentes', methods=['GET'])
 @login_required
 def admin_empresas_pendentes():
-    if not current_user.is_super_admin: return 'Acesso proibido.', 403
+    if not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
     csrf_token = session.setdefault('admin_empresas_csrf_token', secrets.token_urlsafe(32))
     empresas = Empresa.query.filter_by(is_ativa=False).order_by(Empresa.id).all()
     return render_template('painel_admin.html', empresas=empresas, csrf_token=csrf_token)
 
+
 @bp.route('/admin/empresas/<int:id>/ativar', methods=['POST'])
 @login_required
 def admin_ativar_empresa(id):
-    if not current_user.is_super_admin: return 'Acesso proibido.', 403
+    if not current_user.is_super_admin:
+        return 'Acesso proibido.', 403
     token_enviado = request.form.get('csrf_token', '')
     token_sessao = session.get('admin_empresas_csrf_token', '')
-    if not token_sessao or not secrets.compare_digest(token_enviado, token_sessao): return 'Requisição inválida.', 400
+    if not token_sessao or not secrets.compare_digest(token_enviado, token_sessao):
+        return 'Requisição inválida.', 400
     empresa = db.session.get(Empresa, id)
     if empresa:
         empresa.is_ativa = True
@@ -613,20 +660,24 @@ def admin_ativar_empresa(id):
         flash(f'Empresa "{empresa.nome}" ativada com sucesso.', 'success')
     return redirect(url_for('main.admin_empresas_pendentes'))
 
+
 @bp.route('/api/invite', methods=['POST'])
 @login_required
 def gerar_link_convite():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     is_admin = request.json.get('is_admin', False)
     token = get_serializer().dumps({"is_admin": is_admin, "empresa_id": current_user.empresa_id, "action": "invite"})
     return jsonify({"link": url_for('main.processar_convite', token=token, _external=True)})
+
 
 @bp.route('/invite/<token>', methods=['GET', 'POST'])
 def processar_convite(token):
     try:
         data = get_serializer().loads(token, max_age=86400)
-        if data.get('action') != 'invite': raise ValueError
-    except:
+        if data.get('action') != 'invite':
+            raise ValueError
+    except Exception:
         return render_template_string(AUTH_HTML, title="Convite Inválido", subtitle="Este link expirou ou é inválido.", erro="Solicite um novo link.", action="error")
 
     empresa = db.session.get(Empresa, data.get('empresa_id'))
@@ -653,48 +704,62 @@ def processar_convite(token):
         logo_b64=empresa.logo_b64, cor_primaria=empresa.cor_primaria, bg_b64=empresa.bg_b64
     )
 
+
 @bp.route('/api/usuarios/<int:id>/reset_link', methods=['POST'])
 @login_required
 def gerar_link_reset(id):
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     user = User.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
-    if not user: return jsonify({"erro": "Utilizador não encontrado"}), 404
+    if not user:
+        return jsonify({"erro": "Utilizador não encontrado"}), 404
     token = get_serializer().dumps({"user_id": user.id, "action": "reset"})
     return jsonify({"link": url_for('main.processar_reset', token=token, _external=True)})
+
 
 @bp.route('/reset/<token>', methods=['GET', 'POST'])
 def processar_reset(token):
     try:
         data = get_serializer().loads(token, max_age=3600)
-        if data.get('action') != 'reset': raise ValueError
-    except: return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="Este link de segurança expirou.", erro="Solicite novo reset.", action="error")
+        if data.get('action') != 'reset':
+            raise ValueError
+    except Exception:
+        return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="Este link de segurança expirou.", erro="Solicite novo reset.", action="error")
 
     user = db.session.get(User, data['user_id'])
-    if not user: return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="A conta não foi encontrada.", erro="Solicite novo reset.", action="error"), 404
+    if not user:
+        return render_template_string(AUTH_HTML, title="Link Inválido", subtitle="A conta não foi encontrada.", erro="Solicite novo reset.", action="error"), 404
     if request.method == 'POST':
         user.password_hash = generate_password_hash(request.form.get('password'))
         db.session.commit()
         return redirect(url_for('main.login', msg="Palavra-passe atualizada!"))
     return render_template_string(AUTH_HTML, title="Redefinir Palavra-passe", subtitle=f"Acesso para: {user.username}", action="reset", btn_text="Guardar Nova")
 
+
 @bp.route('/api/usuarios', methods=['GET', 'POST'])
 @login_required
 def gerir_usuarios():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     if request.method == 'POST':
         username, password, is_admin = request.json.get('username'), request.json.get('password'), request.json.get('is_admin', False)
-        if not username or not password: return jsonify({"erro": "Preencha todos os campos"}), 400
-        if User.query.filter_by(username=username).first(): return jsonify({"erro": "Nome já existe"}), 400
+        if not username or not password:
+            return jsonify({"erro": "Preencha todos os campos"}), 400
+        if User.query.filter_by(username=username).first():
+            return jsonify({"erro": "Nome já existe"}), 400
         db.session.add(User(empresa_id=current_user.empresa_id, username=username, password_hash=generate_password_hash(password), is_admin=is_admin))
         db.session.commit()
         return jsonify({"status": "sucesso"})
     return jsonify([{"id": u.id, "username": u.username, "is_admin": u.is_admin} for u in User.query.filter_by(empresa_id=current_user.empresa_id).all()])
 
+
 @bp.route('/api/usuarios/<int:id>', methods=['DELETE'])
 @login_required
 def apagar_usuario(id):
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
-    if id == current_user.id: return jsonify({"erro": "Não pode apagar a própria conta"}), 400
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
+    if id == current_user.id:
+        return jsonify({"erro": "Não pode apagar a própria conta"}), 400
     user = User.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
     if user:
         Negocio.query.filter_by(user_id=id, empresa_id=current_user.empresa_id).update({'user_id': None})
@@ -703,23 +768,28 @@ def apagar_usuario(id):
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Utilizador não encontrado"}), 404
 
+
 @bp.route('/api/regras', methods=['GET', 'POST'])
 @login_required
 def gerir_regras():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     if request.method == 'POST':
         palavra, resposta = request.json.get('palavra_chave', '').strip(), request.json.get('resposta', '').strip()
-        if not palavra or not resposta: return jsonify({"erro": "Preencha ambos"}), 400
+        if not palavra or not resposta:
+            return jsonify({"erro": "Preencha ambos"}), 400
         nova_regra = RespostaAutomatica(empresa_id=current_user.empresa_id, palavra_chave=palavra, resposta=resposta)
         db.session.add(nova_regra)
         db.session.commit()
         return jsonify({"status": "sucesso", "id": nova_regra.id})
     return jsonify([{"id": r.id, "palavra_chave": r.palavra_chave, "resposta": r.resposta} for r in RespostaAutomatica.query.filter_by(empresa_id=current_user.empresa_id).all()])
 
+
 @bp.route('/api/regras/<int:id>', methods=['DELETE'])
 @login_required
 def apagar_regra(id):
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     regra = RespostaAutomatica.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
     if regra:
         db.session.delete(regra)
@@ -727,10 +797,12 @@ def apagar_regra(id):
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Não encontrada"}), 404
 
+
 @bp.route('/configuracoes/bot', methods=['GET', 'POST'])
 @login_required
 def configuracoes_bot():
-    if not current_user.is_admin: return 'Acesso negado.', 403
+    if not current_user.is_admin:
+        return 'Acesso negado.', 403
     empresa = db.session.get(Empresa, current_user.empresa_id)
     etapas = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).all()
     erro, form_values = None, {}
@@ -743,48 +815,65 @@ def configuracoes_bot():
         usar_menu = request.form.get('usar_menu_inicial') == 'on'
         etapas_menu, ids_exibidos = {}, set(request.form.getlist('etapa_exibir_no_menu'))
 
-        if not mensagem_saudacao or len(mensagem_saudacao) > 2000: erro = 'Saudação inválida.'
-        elif len(prompt_personalidade) > 10000: erro = 'Orientações grandes demais.'
-        elif tom_resposta not in {'Profissional', 'Descontraído', 'Empático'}: erro = 'Escolha um tom.'
-        elif not mensagem_transbordo or len(mensagem_transbordo) > 500: erro = 'Mensagem de transbordo inválida.'
+        if not mensagem_saudacao or len(mensagem_saudacao) > 2000:
+            erro = 'Saudação inválida.'
+        elif len(prompt_personalidade) > 10000:
+            erro = 'Orientações grandes demais.'
+        elif tom_resposta not in {'Profissional', 'Descontraído', 'Empático'}:
+            erro = 'Escolha um tom.'
+        elif not mensagem_transbordo or len(mensagem_transbordo) > 500:
+            erro = 'Mensagem de transbordo inválida.'
         else:
             numeros_usados = set()
             for etapa in etapas:
                 if str(etapa.id) not in ids_exibidos:
                     etapas_menu[etapa.id] = None
                     continue
-                if len(numeros_usados) >= 9: erro = 'Máximo 9 etapas.'; break
-                try: numero_int = int((request.form.get(f'etapa_numero_{etapa.id}') or '').strip())
-                except: erro = 'Etapa precisa de número.'; break
-                if numero_int < 1 or numero_int > 9 or numero_int in numeros_usados: erro = 'Números inválidos ou repetidos.'; break
+                if len(numeros_usados) >= 9:
+                    erro = 'Máximo 9 etapas.'
+                    break
+                try:
+                    numero_int = int((request.form.get(f'etapa_numero_{etapa.id}') or '').strip())
+                except Exception:
+                    erro = 'Etapa precisa de número.'
+                    break
+                if numero_int < 1 or numero_int > 9 or numero_int in numeros_usados:
+                    erro = 'Números inválidos ou repetidos.'
+                    break
                 numeros_usados.add(numero_int)
                 etapas_menu[etapa.id] = numero_int
-            if not erro and usar_menu and not numeros_usados: erro = 'Selecione ao menos uma etapa para o menu.'
+            if not erro and usar_menu and not numeros_usados:
+                erro = 'Selecione ao menos uma etapa para o menu.'
 
         form_values = {'mensagem_saudacao': mensagem_saudacao, 'prompt_personalidade': prompt_personalidade, 'tom_resposta': tom_resposta, 'mensagem_transbordo': mensagem_transbordo, 'etapas_menu': etapas_menu}
-        if erro: return render_template('configuracoes.html', empresa=empresa, etapas=etapas, erro=erro, form_ativar=usar_menu, form_values=form_values), 400
+        if erro:
+            return render_template('configuracoes.html', empresa=empresa, etapas=etapas, erro=erro, form_ativar=usar_menu, form_values=form_values), 400
 
         empresa.usar_menu_inicial, empresa.mensagem_saudacao, empresa.prompt_personalidade, empresa.tom_resposta, empresa.mensagem_transbordo = usar_menu, mensagem_saudacao, prompt_personalidade, tom_resposta, mensagem_transbordo
         for etapa in etapas:
             etapa.exibir_no_menu = etapas_menu.get(etapa.id) is not None
             etapa.numero_menu = etapas_menu.get(etapa.id)
-        try: db.session.commit()
-        except:
+        try:
+            db.session.commit()
+        except Exception:
             db.session.rollback()
             return render_template('configuracoes.html', empresa=empresa, etapas=etapas, erro='Erro ao salvar.', form_ativar=usar_menu, form_values=form_values), 409
         return redirect(url_for('main.configuracoes_bot', salvo=1))
     return render_template('configuracoes.html', empresa=empresa, etapas=etapas, salvo=request.args.get('salvo') == '1')
 
+
 @bp.route('/api/configuracoes', methods=['GET', 'POST'])
 @login_required
 def configuracoes():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     config = Configuracao.query.filter_by(empresa_id=current_user.empresa_id).first()
     if request.method == 'POST':
         config.prompt_ia = request.json.get('prompt_ia', config.prompt_ia)
         db.session.commit()
         return jsonify({"status": "sucesso"})
     return jsonify({"prompt_ia": config.prompt_ia if config else ""})
+
 
 @bp.route('/api/assign_user', methods=['POST'])
 @login_required
@@ -793,17 +882,21 @@ def assign_user():
     if negocio:
         if current_user.is_admin:
             user_id = request.json.get('user_id')
-            if user_id and not User.query.filter_by(id=user_id, empresa_id=current_user.empresa_id).first(): return jsonify({"erro": "Inválido"}), 404
+            if user_id and not User.query.filter_by(id=user_id, empresa_id=current_user.empresa_id).first():
+                return jsonify({"erro": "Inválido"}), 404
             negocio.user_id = user_id
-        else: negocio.user_id = current_user.id
+        else:
+            negocio.user_id = current_user.id
         db.session.commit()
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Não encontrado"}), 404
 
+
 @bp.route('/api/etapas', methods=['GET', 'POST'])
 @login_required
 def gerir_etapas():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     if request.method == 'POST':
         if request.json.get('nome'):
             db.session.add(Etapa(empresa_id=current_user.empresa_id, nome=request.json.get('nome')))
@@ -812,20 +905,25 @@ def gerir_etapas():
         return jsonify({"erro": "Inválido"}), 400
     return jsonify([{"id": e.id, "nome": e.nome, "qtd_negocios": len(e.negocios)} for e in Etapa.query.filter_by(empresa_id=current_user.empresa_id).all()])
 
+
 @bp.route('/api/etapas/<int:id>', methods=['PUT', 'DELETE'])
 @login_required
 def editar_etapa(id):
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado"}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
     etapa = Etapa.query.filter_by(id=id, empresa_id=current_user.empresa_id).first()
-    if not etapa: return jsonify({"erro": "Não encontrada"}), 404
+    if not etapa:
+        return jsonify({"erro": "Não encontrada"}), 404
     if request.method == 'PUT':
         etapa.nome = request.json.get('nome', etapa.nome)
         db.session.commit()
         return jsonify({"status": "sucesso"})
-    if len(etapa.negocios) > 0: return jsonify({"erro": "Possui negócios."}), 400
+    if len(etapa.negocios) > 0:
+        return jsonify({"erro": "Possui negócios."}), 400
     db.session.delete(etapa)
     db.session.commit()
     return jsonify({"status": "sucesso"})
+
 
 @bp.route('/')
 @login_required
@@ -838,17 +936,22 @@ def index():
         users=User.query.filter_by(empresa_id=current_user.empresa_id).all() if current_user.is_admin else []
     )
 
+
 @bp.route('/api/leads', methods=['POST'])
 @login_required
 def criar_lead():
     dados = request.get_json(silent=True) or {}
     nome, telefone, titulo = (dados.get('nome') or '').strip(), re.sub(r'\D', '', str(dados.get('telefone') or '')), (dados.get('titulo') or '').strip()
-    if not nome or len(nome) > 100 or not telefone or len(telefone) > 20: return jsonify({"erro": "Dados inválidos."}), 400
-    try: valor = float(dados.get('valor') or 0)
-    except: return jsonify({"erro": "Valor inválido."}), 400
+    if not nome or len(nome) > 100 or not telefone or len(telefone) > 20:
+        return jsonify({"erro": "Dados inválidos."}), 400
+    try:
+        valor = float(dados.get('valor') or 0)
+    except Exception:
+        return jsonify({"erro": "Valor inválido."}), 400
     etapa_id = dados.get('etapa_id')
     etapa = Etapa.query.filter_by(id=int(etapa_id) if etapa_id else None, empresa_id=current_user.empresa_id).first() if etapa_id else Etapa.query.filter_by(empresa_id=current_user.empresa_id).order_by(Etapa.id).first()
-    if not etapa: return jsonify({"erro": "Etapa não encontrada."}), 400
+    if not etapa:
+        return jsonify({"erro": "Etapa não encontrada."}), 400
 
     pessoa = Pessoa.query.filter_by(empresa_id=current_user.empresa_id, telefone=telefone).first()
     if not pessoa:
@@ -861,14 +964,18 @@ def criar_lead():
     db.session.commit()
     return jsonify({"status": "sucesso", "lead_id": negocio.id, "pessoa_id": pessoa.id}), 201
 
+
 @bp.route('/api/get_chat/<int:pessoa_id>')
 @login_required
 def get_chat(pessoa_id):
     pessoa = Pessoa.query.filter_by(id=pessoa_id, empresa_id=current_user.empresa_id).first()
-    if not pessoa: return jsonify({"erro": "Não encontrada"}), 404
-    for msg in Mensagem.query.filter_by(pessoa_id=pessoa_id, empresa_id=current_user.empresa_id, tipo='inbound', lida=False).all(): msg.lida = True
+    if not pessoa:
+        return jsonify({"erro": "Não encontrada"}), 404
+    for msg in Mensagem.query.filter_by(pessoa_id=pessoa_id, empresa_id=current_user.empresa_id, tipo='inbound', lida=False).all():
+        msg.lida = True
     db.session.commit()
     return jsonify({"nome": pessoa.nome, "telefone": pessoa.telefone, "mensagens": [_formatar_mensagem_chat(m) for m in Mensagem.query.filter_by(pessoa_id=pessoa.id, empresa_id=current_user.empresa_id).order_by(Mensagem.id).all()], "etiquetas": [{"id": e.id, "nome": e.nome} for e in pessoa.etiquetas], "ia_ativa": pessoa.ia_ativa})
+
 
 @bp.route('/api/encerrar_atendimento/<int:pessoa_id>', methods=['POST'])
 @bp.route('/api/atendimento/<int:pessoa_id>/encerrar', methods=['POST'])
@@ -880,32 +987,41 @@ def encerrar_atendimento(pessoa_id):
         db.session.commit()
     return jsonify({"status": "success"})
 
+
 def _formatar_mensagem_chat(mensagem):
     d = FUSO_HORARIO_BR.localize(mensagem.data_envio) if mensagem.data_envio and mensagem.data_envio.tzinfo is None else (mensagem.data_envio.astimezone(FUSO_HORARIO_BR) if mensagem.data_envio else None)
     return {"id": mensagem.id, "direcao": mensagem.tipo, "conteudo": mensagem.mensagem, "data_envio": d.isoformat() if d else "", "hora": d.strftime("%H:%M") if d else ""}
+
 
 @bp.route('/api/mensagens/novas/<int:ultimo_id_mensagem>')
 @login_required
 def mensagens_novas(ultimo_id_mensagem):
     pessoa = Pessoa.query.filter_by(id=request.args.get('pessoa_id', type=int), empresa_id=current_user.empresa_id).first()
-    if not pessoa: return jsonify({"erro": "Não encontrada."}), 404
+    if not pessoa:
+        return jsonify({"erro": "Não encontrada."}), 404
     mensagens = Mensagem.query.filter(Mensagem.empresa_id == current_user.empresa_id, Mensagem.pessoa_id == pessoa.id, Mensagem.id > ultimo_id_mensagem).order_by(Mensagem.id).limit(100).all()
     for m in mensagens:
-        if m.tipo == 'inbound': m.lida = True
+        if m.tipo == 'inbound':
+            m.lida = True
     db.session.commit()
     return jsonify([_formatar_mensagem_chat(m) for m in mensagens])
+
 
 @bp.route('/api/etiquetas', methods=['GET', 'POST'])
 @login_required
 def gerir_etiquetas():
-    if request.method == 'GET': return jsonify([{"id": e.id, "nome": e.nome} for e in Etiqueta.query.filter_by(empresa_id=current_user.empresa_id).order_by(Etiqueta.nome).all()])
+    if request.method == 'GET':
+        return jsonify([{"id": e.id, "nome": e.nome} for e in Etiqueta.query.filter_by(empresa_id=current_user.empresa_id).order_by(Etiqueta.nome).all()])
     nome = (request.get_json(silent=True) or {}).get('nome', '').strip()
-    if not nome or len(nome) > 40: return jsonify({"erro": "Inválida"}), 400
-    if Etiqueta.query.filter(Etiqueta.empresa_id == current_user.empresa_id, db.func.lower(Etiqueta.nome) == nome.lower()).first(): return jsonify({"erro": "Já existe."}), 409
+    if not nome or len(nome) > 40:
+        return jsonify({"erro": "Inválida"}), 400
+    if Etiqueta.query.filter(Etiqueta.empresa_id == current_user.empresa_id, db.func.lower(Etiqueta.nome) == nome.lower()).first():
+        return jsonify({"erro": "Já existe."}), 409
     e = Etiqueta(empresa_id=current_user.empresa_id, nome=nome)
     db.session.add(e)
     db.session.commit()
     return jsonify({"id": e.id, "nome": e.nome}), 201
+
 
 @bp.route('/api/conversas/<int:pessoa_id>/etiquetas', methods=['PUT'])
 @login_required
@@ -915,11 +1031,14 @@ def atualizar_etiquetas_conversa(pessoa_id):
     etiqueta = Etiqueta.query.filter_by(id=dados.get('etiqueta_id'), empresa_id=current_user.empresa_id).first()
     if pessoa and etiqueta:
         acao = dados.get('acao', 'adicionar')
-        if acao == 'adicionar' and etiqueta not in pessoa.etiquetas: pessoa.etiquetas.append(etiqueta)
-        elif acao == 'remover' and etiqueta in pessoa.etiquetas: pessoa.etiquetas.remove(etiqueta)
+        if acao == 'adicionar' and etiqueta not in pessoa.etiquetas:
+            pessoa.etiquetas.append(etiqueta)
+        elif acao == 'remover' and etiqueta in pessoa.etiquetas:
+            pessoa.etiquetas.remove(etiqueta)
         db.session.commit()
         return jsonify({"etiquetas": [{"id": i.id, "nome": i.nome} for i in pessoa.etiquetas]})
     return jsonify({"erro": "Não encontrado"}), 404
+
 
 @bp.route('/api/conversas/<int:pessoa_id>/assistente-ia', methods=['POST'])
 @login_required
@@ -932,12 +1051,14 @@ def atualizar_assistente_conversa(pessoa_id):
         return jsonify({"status": "sucesso", "ia_ativa": pessoa.ia_ativa})
     return jsonify({"erro": "Não encontrado"}), 404
 
+
 @bp.route('/api/send_message', methods=['POST'])
 @login_required
 def send_message():
     dados = request.json
     pessoa = Pessoa.query.filter_by(id=dados.get('pessoa_id'), empresa_id=current_user.empresa_id).first()
-    if not pessoa: return jsonify({"erro": "Não encontrado"}), 404
+    if not pessoa:
+        return jsonify({"erro": "Não encontrado"}), 404
     texto, media_b64 = dados.get('texto', ''), dados.get('media')
     api_url, api_key, instance_name = current_app.config['EVOLUTION_API_URL'], current_app.config['EVOLUTION_API_KEY'], current_user.empresa.instancia_whatsapp
     if media_b64:
@@ -954,6 +1075,7 @@ def send_message():
             return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Falha no envio"}), 500
 
+
 @bp.route('/api/update_deal_stage', methods=['POST'])
 @login_required
 def update_deal_stage():
@@ -965,11 +1087,15 @@ def update_deal_stage():
         return jsonify({"status": "sucesso"})
     return jsonify({"erro": "Não encontrado"}), 404
 
+
 @bp.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
-    try: processar_mensagem_whatsapp.delay(request.get_json(silent=True))
-    except: return jsonify({"status": "queue_unavailable"}), 503
+    try:
+        processar_mensagem_whatsapp.delay(request.get_json(silent=True))
+    except Exception:
+        return jsonify({"status": "queue_unavailable"}), 503
     return jsonify({"status": "queued"}), 200
+
 
 @bp.route('/api/check_updates')
 @login_required
@@ -977,42 +1103,56 @@ def check_updates():
     msg = Mensagem.query.filter_by(empresa_id=current_user.empresa_id).order_by(Mensagem.id.desc()).first()
     if msg:
         txt = msg.mensagem
-        try: txt = f"📎 [Ficheiro] {json.loads(txt).get('caption', '')}"
-        except: pass
+        try:
+            txt = f"📎 [Ficheiro] {json.loads(txt).get('caption', '')}"
+        except Exception:
+            pass
         return jsonify({"ultima_mensagem_id": msg.id, "remetente": msg.pessoa.nome, "texto": txt, "tipo": msg.tipo})
     return jsonify({"ultima_mensagem_id": 0})
+
 
 @bp.route('/api/get_qr')
 @login_required
 def get_qr():
     try:
         res = requests.get(f"{current_app.config['EVOLUTION_API_URL']}/instance/connect/{current_user.empresa.instancia_whatsapp}", headers={"apikey": current_app.config['EVOLUTION_API_KEY']}).json()
-        if res.get('instance', {}).get('state') == 'open': return jsonify({"status": "connected"}), 200
+        if res.get('instance', {}).get('state') == 'open':
+            return jsonify({"status": "connected"}), 200
         b64 = res.get('base64') or (res.get('qrcode', {}).get('base64') if isinstance(res.get('qrcode'), dict) else None)
         return jsonify({"status": "qr", "qr_base64": b64} if b64 else {"status": "pending", "detalhe": "A aguardar QR Code"}), 200
-    except Exception as e: return jsonify({"status": "error", "erro": str(e)}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "erro": str(e)}), 200
+
 
 @bp.route('/api/disconnect', methods=['POST'])
 @login_required
 def disconnect_whatsapp():
-    if not current_user.is_admin: return jsonify({"erro": "Acesso negado."}), 403
+    if not current_user.is_admin:
+        return jsonify({"erro": "Acesso negado."}), 403
     requests.delete(f"{current_app.config['EVOLUTION_API_URL']}/instance/logout/{current_user.empresa.instancia_whatsapp}", headers=evolution_headers())
     return jsonify({"status": "desconectado"})
+
 
 @bp.route('/api/metrics')
 @login_required
 def metrics():
     q = Negocio.query.filter_by(empresa_id=current_user.empresa_id)
-    if not current_user.is_admin: q = q.filter_by(user_id=current_user.id)
+    if not current_user.is_admin:
+        q = q.filter_by(user_id=current_user.id)
     total, funil, fechamentos, tempos = q.count(), [], 0, []
     for e in Etapa.query.filter_by(empresa_id=current_user.empresa_id).all():
         qtd = q.filter_by(etapa_id=e.id).count()
-        if 'fechamento' in e.nome.lower() or 'ganho' in e.nome.lower(): fechamentos += qtd
-        funil.append({"nome": e.nome, "quantidade": qtd, "porcentagem": (qtd/total*100) if total>0 else 0})
+        if 'fechamento' in e.nome.lower() or 'ganho' in e.nome.lower():
+            fechamentos += qtd
+        funil.append({"nome": e.nome, "quantidade": qtd, "porcentagem": (qtd / total * 100) if total > 0 else 0})
     for p in Pessoa.query.filter_by(empresa_id=current_user.empresa_id).all():
         hin = None
         for m in Mensagem.query.filter_by(empresa_id=current_user.empresa_id, pessoa_id=p.id).order_by(Mensagem.data_envio).all():
-            if not m.data_envio: continue
-            if m.tipo == 'inbound' and not hin: hin = m.data_envio
-            elif m.tipo == 'outbound' and hin: tempos.append((m.data_envio - hin).total_seconds()/60.0); hin = None
-    return jsonify({"total_negocios": total, "taxa_conversao": round((fechamentos/total*100) if total>0 else 0, 1), "funil": funil, "sla_minutos": round(sum(tempos)/len(tempos) if tempos else 0, 1)})
+            if not m.data_envio:
+                continue
+            if m.tipo == 'inbound' and not hin:
+                hin = m.data_envio
+            elif m.tipo == 'outbound' and hin:
+                tempos.append((m.data_envio - hin).total_seconds() / 60.0)
+                hin = None
+    return jsonify({"total_negocios": total, "taxa_conversao": round((fechamentos / total * 100) if total > 0 else 0, 1), "funil": funil, "sla_minutos": round(sum(tempos) / len(tempos) if tempos else 0, 1)})
