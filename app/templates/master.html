@@ -152,13 +152,13 @@
                                         Marca & Cores
                                     </button>
 
-                                    <!-- Botão de Configurar IA -->
+                                    <!-- Botão de Configurar IA e Perguntas/Respostas -->
                                     <button type="button"
                                         data-id="{{ empresa.id }}"
                                         data-nome="{{ empresa.nome }}"
                                         onclick="abrirModalConfigIA(this.dataset.id, this.dataset.nome)"
                                         class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer"
-                                        title="Personalizar Inteligência Artificial">
+                                        title="Personalizar Inteligência Artificial e Perguntas/Respostas">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                         Config. IA
                                     </button>
@@ -318,19 +318,37 @@
         </div>
     </div>
 
-    <!-- MODAL: Configurar IA Master -->
-    <div id="modal-config-ia" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <!-- MODAL: Configurar IA & Simulador de Perguntas e Respostas -->
+    <div id="modal-config-ia" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col border border-slate-200">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <div>
-                    <h3 class="font-bold text-slate-800">Personalizar Inteligência Artificial</h3>
-                    <p id="ia-empresa-nome" class="text-xs text-slate-500 mt-0.5">Empresa</p>
+                    <h3 class="font-bold text-slate-800 text-lg">Personalizar Inteligência Artificial & Respostas</h3>
+                    <p id="ia-empresa-nome" class="text-xs font-semibold text-indigo-600 mt-0.5">Empresa</p>
                 </div>
                 <button type="button" onclick="document.getElementById('modal-config-ia').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
             </div>
             
-            <div class="p-6 overflow-y-auto">
+            <div class="p-6 overflow-y-auto space-y-5 flex-1">
                 <input type="hidden" id="ia_empresa_id">
+                
+                <!-- SECÇÃO: PERGUNTAS E RESPOSTAS (FUNCIONA COM E SEM IA) -->
+                <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
+                    <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-indigo-950 uppercase tracking-wider">Perguntas e Respostas da Empresa (Atendimento Garantido)</h4>
+                            <p class="text-[11px] text-slate-600 mt-0.5">O próprio sistema simula o atendimento usando estas respostas mesmo sem IA ativa, além de alimentar a IA quando conectada.</p>
+                        </div>
+                        <button type="button" onclick="adicionarCampoFAQ()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer">
+                            + Nova Pergunta
+                        </button>
+                    </div>
+
+                    <div id="faq-container" class="space-y-3 mt-3 max-h-64 overflow-y-auto pr-1">
+                        <!-- Campos dinâmicos inseridos via JS -->
+                    </div>
+                </div>
+
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Tom de Resposta</label>
@@ -342,21 +360,22 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Primeira Mensagem (Saudação)</label>
-                        <textarea id="ia_saudacao" rows="3" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"></textarea>
+                        <textarea id="ia_saudacao" rows="2" placeholder="Ex: Olá! Que bom ter você aqui. Como você prefere ser chamado(a)?" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"></textarea>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Mensagem de Transbordo (Erro/Transferência)</label>
-                        <textarea id="ia_transbordo" rows="2" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"></textarea>
+                        <textarea id="ia_transbordo" rows="2" placeholder="Ex: Prontinho! Vou transferir você agora para a nossa recepção finalizar seu atendimento." class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"></textarea>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Regras de Personalidade da Empresa (Prompt)</label>
-                        <textarea id="ia_personalidade" rows="4" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"></textarea>
+                        <textarea id="ia_personalidade" rows="3" class="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"></textarea>
                     </div>
                 </div>
             </div>
-            <div class="p-6 border-t border-slate-100 shrink-0">
-                <button type="button" onclick="salvarConfigIA()" id="btn-salvar-ia" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                    Salvar Configurações de IA
+            
+            <div class="p-5 px-6 border-t border-slate-100 shrink-0 bg-slate-50">
+                <button type="button" onclick="salvarConfigIA()" id="btn-salvar-ia" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+                    Salvar Configurações de IA e Respostas
                 </button>
             </div>
         </div>
@@ -364,6 +383,14 @@
 
     <!-- SCRIPTS MESTRES -->
     <script>
+        function escaparHtml(str) {
+            return (str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
         function abrirModalBranding(empresaId, empresaNome, corAtual) {
             document.getElementById('branding-empresa-nome').textContent = empresaNome;
             document.getElementById('branding_cor').value = corAtual || '#2563eb';
@@ -396,6 +423,26 @@
             }
         }
 
+        function adicionarCampoFAQ(pergunta = '', resposta = '') {
+            const container = document.getElementById('faq-container');
+            const avisoVazio = document.getElementById('faq-empty-msg');
+            if (avisoVazio) avisoVazio.remove();
+
+            const div = document.createElement('div');
+            div.className = 'faq-item bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm space-y-2';
+            div.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded uppercase tracking-wider shrink-0">Pergunta / Gatilhos</span>
+                    <input type="text" value="${escaparHtml(pergunta)}" placeholder="Ex: valor, preço, quanto custa, consulta (separe sinônimos por vírgula)" class="faq-pergunta flex-1 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button type="button" onclick="this.closest('.faq-item').remove()" class="text-xs font-bold text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors cursor-pointer" title="Excluir pergunta">Remover</button>
+                </div>
+                <div>
+                    <textarea rows="2" placeholder="Digite a resposta exata que o cliente receberá no WhatsApp..." class="faq-resposta w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none">${escaparHtml(resposta)}</textarea>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
         async function abrirModalConfigIA(empresaId, empresaNome) {
             document.getElementById('ia_empresa_id').value = empresaId;
             document.getElementById('ia-empresa-nome').textContent = empresaNome;
@@ -405,6 +452,9 @@
             document.getElementById('ia_transbordo').value = 'Carregando...';
             document.getElementById('ia_personalidade').value = 'Carregando...';
 
+            const container = document.getElementById('faq-container');
+            container.innerHTML = '<p class="text-xs text-slate-400 py-2">Carregando perguntas e respostas...</p>';
+
             try {
                 const res = await fetch(`/optmiza-master/empresa/${empresaId}/config`);
                 const data = await res.json();
@@ -413,8 +463,15 @@
                 document.getElementById('ia_saudacao').value = data.mensagem_saudacao || '';
                 document.getElementById('ia_transbordo').value = data.mensagem_transbordo || '';
                 document.getElementById('ia_personalidade').value = data.prompt_personalidade || '';
+
+                container.innerHTML = '';
+                if (data.faqs && data.faqs.length > 0) {
+                    data.faqs.forEach(f => adicionarCampoFAQ(f.pergunta, f.resposta));
+                } else {
+                    container.innerHTML = '<p id="faq-empty-msg" class="text-xs text-slate-400 italic py-2 text-center">Nenhuma pergunta cadastrada ainda para esta empresa. Clique em "+ Nova Pergunta".</p>';
+                }
             } catch (e) {
-                alert("Erro ao buscar configurações atuais.");
+                container.innerHTML = '<p class="text-xs text-red-500 py-2">Erro ao carregar configurações atuais.</p>';
             }
         }
 
@@ -426,11 +483,21 @@
             btn.innerHTML = 'Salvando...';
             btn.disabled = true;
 
+            const faqs = [];
+            document.querySelectorAll('#faq-container .faq-item').forEach(item => {
+                const p = item.querySelector('.faq-pergunta').value.trim();
+                const r = item.querySelector('.faq-resposta').value.trim();
+                if (p && r) {
+                    faqs.push({ pergunta: p, resposta: r });
+                }
+            });
+
             const payload = {
                 tom_resposta: document.getElementById('ia_tom').value,
                 mensagem_saudacao: document.getElementById('ia_saudacao').value,
                 mensagem_transbordo: document.getElementById('ia_transbordo').value,
-                prompt_personalidade: document.getElementById('ia_personalidade').value
+                prompt_personalidade: document.getElementById('ia_personalidade').value,
+                faqs: faqs
             };
 
             try {
@@ -441,7 +508,7 @@
                 });
                 
                 if (res.ok) {
-                    alert("Configurações de IA atualizadas com sucesso!");
+                    alert("Configurações de IA e Perguntas/Respostas atualizadas com sucesso!");
                     document.getElementById('modal-config-ia').classList.add('hidden');
                 } else {
                     alert("Erro ao salvar.");
