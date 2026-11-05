@@ -160,6 +160,17 @@
                                     </button>
                                 </div>
                             </div>
+
+                            <div class="mb-5 rounded-lg border border-emerald-100 bg-white/80 p-4">
+                                <label for="lista_regras" class="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Adicionar várias de uma vez</label>
+                                <p class="mb-2 text-xs text-slate-500">Cole uma pergunta e resposta por linha, separadas por <b>|</b> ou por uma tabulação. Exemplo: <code>catálogo | Segue o nosso catálogo...</code></p>
+                                <textarea id="lista_regras" rows="5" placeholder="catálogo | Segue o nosso catálogo: https://exemplo.com&#10;horário | Funcionamos de segunda a sexta, das 9h às 18h." class="w-full bg-white border border-slate-300 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"></textarea>
+                                <div class="mt-2 flex justify-end">
+                                    <button type="button" onclick="adicionarListaRegras()" id="btn_adicionar_lista_regras" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2.5 rounded-lg transition-all text-sm shadow-sm">
+                                        Adicionar lista
+                                    </button>
+                                </div>
+                            </div>
                         
                             <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
                                 <table class="w-full text-left">
@@ -335,6 +346,65 @@
                 }
             } catch (error) {
                 console.error("Erro ao adicionar:", error);
+            }
+        }
+
+        async function adicionarListaRegras() {
+            const listaInput = document.getElementById('lista_regras');
+            const linhas = listaInput.value.split(/\r?\n/);
+            const regras = [];
+            const linhasInvalidas = [];
+
+            linhas.forEach((linha, indice) => {
+                if (!linha.trim()) return;
+
+                const separador = linha.includes('\t') ? '\t' : '|';
+                const posicaoSeparador = linha.indexOf(separador);
+                if (posicaoSeparador < 0) {
+                    linhasInvalidas.push(indice + 1);
+                    return;
+                }
+
+                const palavra = linha.slice(0, posicaoSeparador).trim();
+                const resposta = linha.slice(posicaoSeparador + 1).trim();
+                if (!palavra || !resposta || palavra.length > 100) {
+                    linhasInvalidas.push(indice + 1);
+                    return;
+                }
+                regras.push({ palavra_chave: palavra, resposta });
+            });
+
+            if (linhasInvalidas.length) {
+                alert(`Verifique as linhas ${linhasInvalidas.join(', ')}. Use "pergunta | resposta" e mantenha a pergunta até 100 caracteres.`);
+                return;
+            }
+            if (!regras.length) {
+                alert('Cole pelo menos uma pergunta e resposta no formato indicado.');
+                return;
+            }
+
+            const botao = document.getElementById('btn_adicionar_lista_regras');
+            botao.disabled = true;
+            try {
+                const res = await fetch('/api/regras', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ regras })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.erro || 'Erro ao adicionar as respostas.');
+                    return;
+                }
+
+                listaInput.value = '';
+                await carregarRegras();
+                alert(`${data.quantidade} respostas rápidas adicionadas com sucesso.`);
+            } catch (error) {
+                console.error('Erro ao adicionar lista de respostas:', error);
+                alert('Não foi possível adicionar a lista. Tente novamente.');
+            } finally {
+                botao.disabled = false;
             }
         }
 

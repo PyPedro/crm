@@ -786,8 +786,42 @@ def gerir_regras():
     if not current_user.is_admin:
         return jsonify({"erro": "Acesso negado"}), 403
     if request.method == 'POST':
-        palavra, resposta = request.json.get('palavra_chave', '').strip(), request.json.get('resposta', '').strip()
-        if not palavra or not resposta:
+        dados = request.get_json(silent=True)
+        if not isinstance(dados, dict):
+            return jsonify({"erro": "O conteúdo enviado é inválido"}), 400
+
+        if 'regras' in dados:
+            regras = dados['regras']
+            if not isinstance(regras, list) or not regras:
+                return jsonify({"erro": "Envie uma lista com pelo menos uma pergunta e resposta"}), 400
+
+            novas_regras = []
+            for indice, item in enumerate(regras, start=1):
+                if not isinstance(item, dict):
+                    return jsonify({"erro": f"A pergunta e resposta da linha {indice} são inválidas"}), 400
+                palavra = item.get('palavra_chave')
+                resposta = item.get('resposta')
+                if not isinstance(palavra, str) or not isinstance(resposta, str):
+                    return jsonify({"erro": f"Preencha a pergunta e resposta da linha {indice}"}), 400
+                palavra, resposta = palavra.strip(), resposta.strip()
+                if not palavra or not resposta or len(palavra) > 100:
+                    return jsonify({"erro": f"Verifique a pergunta e resposta da linha {indice}; a pergunta deve ter até 100 caracteres"}), 400
+                novas_regras.append(RespostaAutomatica(
+                    empresa_id=current_user.empresa_id,
+                    palavra_chave=palavra,
+                    resposta=resposta,
+                ))
+
+            db.session.add_all(novas_regras)
+            db.session.commit()
+            return jsonify({"status": "sucesso", "quantidade": len(novas_regras)})
+
+        palavra = dados.get('palavra_chave')
+        resposta = dados.get('resposta')
+        if not isinstance(palavra, str) or not isinstance(resposta, str):
+            return jsonify({"erro": "Preencha ambos"}), 400
+        palavra, resposta = palavra.strip(), resposta.strip()
+        if not palavra or not resposta or len(palavra) > 100:
             return jsonify({"erro": "Preencha ambos"}), 400
         nova_regra = RespostaAutomatica(empresa_id=current_user.empresa_id, palavra_chave=palavra, resposta=resposta)
         db.session.add(nova_regra)
