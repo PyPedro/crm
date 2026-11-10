@@ -92,19 +92,22 @@
         </header>
 
         <!-- KANBAN BOARD -->
-        <main id="kanban-board" class="min-w-0 flex-1 overflow-x-auto overscroll-x-contain touch-pan-x p-4 md:p-8 flex flex-nowrap gap-4 md:gap-6 items-start">
+        <main id="kanban-board" class="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto md:overflow-x-auto md:overflow-y-hidden overscroll-x-contain touch-pan-x p-4 md:p-8 flex flex-col md:flex-row flex-nowrap gap-4 md:gap-6 items-stretch md:items-start">
             {% for etapa in etapas %}
-            <div class="bg-white/75 backdrop-blur-md rounded-[1.25rem] w-[300px] min-w-[300px] md:w-[320px] md:min-w-[320px] flex-shrink-0 flex flex-col max-h-full border border-white/60 shadow-md">
-                <div class="p-4 flex justify-between items-center">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 rounded-full bg-brand-500"></div>
-                        <h2 class="break-words font-bold text-slate-700 text-sm">{{ etapa.nome }}</h2>
-                    </div>
+            <div class="bg-white/75 backdrop-blur-md rounded-[1.25rem] w-full min-w-0 md:w-[320px] md:min-w-[320px] flex-shrink-0 flex flex-col md:max-h-full border border-white/60 shadow-md">
                     {% set negocios_ativos = etapa.negocios|rejectattr('pessoa.status_atendimento', 'equalto', 'fechado')|list %}
-                    <span class="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">{{ negocios_ativos|length }}</span>
-                </div>
+                <button type="button" class="w-full min-h-14 p-4 flex justify-between items-center gap-3 text-left rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" aria-expanded="false" aria-controls="kanban-cards-{{ etapa.id }}" onclick="alternarColunaKanban(this)">
+                    <span class="min-w-0 flex items-center gap-2">
+                        <span class="w-2 h-2 flex-shrink-0 rounded-full bg-brand-500"></span>
+                        <span class="break-words font-bold text-slate-700 text-sm">{{ etapa.nome }}</span>
+                    </span>
+                    <span class="flex flex-shrink-0 items-center gap-3">
+                        <span class="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">{{ negocios_ativos|length }}</span>
+                        <svg class="kanban-chevron h-4 w-4 text-slate-500 transition-transform duration-300 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                </button>
                 
-                <div class="px-3 pb-3 flex-1 overflow-y-auto space-y-3 sortable-col min-h-[150px]" data-etapa-id="{{ etapa.id }}">
+                <div id="kanban-cards-{{ etapa.id }}" aria-hidden="true" inert class="kanban-cards max-h-0 overflow-hidden px-3 pb-3 opacity-0 transition-[max-height,opacity] duration-300 ease-in-out md:min-h-[150px] md:max-h-none md:flex-1 md:overflow-y-auto md:opacity-100 md:pointer-events-auto space-y-3 sortable-col" data-etapa-id="{{ etapa.id }}">
                     {% for negocio in negocios_ativos %}
                         {% if current_user.is_admin or negocio.user_id == current_user.id or not negocio.user_id %}
                         
@@ -476,7 +479,41 @@
         // ==========================================
         // 1. KANBAN (DRAG AND DROP) & ATRIBUIÇÃO
         // ==========================================
+        const kanbanDesktop = window.matchMedia('(min-width: 768px)');
+
+        function definirColunaKanbanAberta(botao, aberta) {
+            const cartoes = document.getElementById(botao.getAttribute('aria-controls'));
+            if (!cartoes) return;
+            botao.setAttribute('aria-expanded', String(aberta));
+            cartoes.setAttribute('aria-hidden', String(!aberta));
+            cartoes.inert = !aberta;
+            cartoes.classList.toggle('max-h-0', !aberta);
+            cartoes.classList.toggle('max-h-[60vh]', aberta);
+            cartoes.classList.toggle('overflow-y-auto', aberta);
+            cartoes.classList.toggle('opacity-0', !aberta);
+            cartoes.classList.toggle('opacity-100', aberta);
+            cartoes.classList.toggle('pointer-events-none', !aberta);
+            botao.querySelector('.kanban-chevron').classList.toggle('rotate-180', aberta);
+        }
+
+        function alternarColunaKanban(botao) {
+            if (kanbanDesktop.matches) return;
+            definirColunaKanbanAberta(
+                botao,
+                botao.getAttribute('aria-expanded') !== 'true',
+            );
+        }
+
+        function atualizarAcordeoesKanban() {
+            document.querySelectorAll('#kanban-board button[aria-controls^="kanban-cards-"]').forEach(botao => {
+                definirColunaKanbanAberta(botao, kanbanDesktop.matches);
+            });
+        }
+
+        kanbanDesktop.addEventListener('change', atualizarAcordeoesKanban);
+
         function inicializarDragAndDrop() {
+            atualizarAcordeoesKanban();
             document.querySelectorAll('.sortable-col').forEach(coluna => {
                 new Sortable(coluna, {
                     group: 'kanban', animation: 200, ghostClass: 'opacity-40', dragClass: 'shadow-2xl',
