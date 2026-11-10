@@ -79,6 +79,7 @@ class Etapa(db.Model):
     nome = db.Column(db.String(50), nullable=False)
     exibir_no_menu = db.Column(db.Boolean, default=False)
     numero_menu = db.Column(db.Integer, nullable=True)
+    mensagem_etapa = db.Column(db.Text, nullable=True)
 
     negocios = db.relationship('Negocio', backref='etapa', lazy=True)
 

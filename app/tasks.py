@@ -681,28 +681,48 @@ def _processar_payload(payload):
         raise RuntimeError(
             f'A opção {opcao.get("numero")} do roteiro aponta para uma etapa inexistente.'
         )
+    proximo_no = opcao.get('proximo_no')
+    if proximo_no is not None and proximo_no not in nos:
+        raise RuntimeError(
+            f'A opção {opcao.get("numero")} aponta para o nó inexistente {proximo_no!r}.'
+        )
+
     negocio = Negocio.query.filter_by(
         empresa_id=empresa.id, pessoa_id=pessoa.id
     ).order_by(Negocio.id).first()
     if negocio:
         negocio.etapa_id = etapa.id
 
-    proximo_no = opcao.get('proximo_no')
     if proximo_no is None:
+        db.session.commit()
+        if etapa.mensagem_etapa:
+            _simular_digitacao(instancia, telefone, 1.0)
+            _enviar_resposta(
+                empresa.id,
+                pessoa.id,
+                telefone,
+                instancia,
+                _personalizar_mensagem(etapa.mensagem_etapa, empresa, pessoa),
+            )
         _simular_digitacao(instancia, telefone, 1.2)
         _transferir_para_humano(
             empresa, pessoa, telefone, instancia, empresa.mensagem_transbordo
         )
         return 'transferred'
-    if proximo_no not in nos:
-        raise RuntimeError(
-            f'A opção {opcao.get("numero")} aponta para o nó inexistente {proximo_no!r}.'
-        )
 
     pessoa.status_atendimento = 'menu'
     pessoa.ia_ativa = False
     pessoa.roteiro_no_atual = proximo_no
     db.session.commit()
+    if etapa.mensagem_etapa:
+        _simular_digitacao(instancia, telefone, 1.0)
+        _enviar_resposta(
+            empresa.id,
+            pessoa.id,
+            telefone,
+            instancia,
+            _personalizar_mensagem(etapa.mensagem_etapa, empresa, pessoa),
+        )
     _simular_digitacao(instancia, telefone, 1.2)
     _enviar_resposta(
         empresa.id,

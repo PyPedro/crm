@@ -98,6 +98,7 @@ def create_app(config_overrides=None):
             'etapa': {
                 'exibir_no_menu': 'BOOLEAN NOT NULL DEFAULT FALSE',
                 'numero_menu': 'INTEGER',
+                'mensagem_etapa': 'TEXT',
             },
             'pessoa': {
                 'ia_ativa': 'BOOLEAN NOT NULL DEFAULT TRUE',

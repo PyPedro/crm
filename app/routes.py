@@ -1039,6 +1039,10 @@ def configuracoes_bot():
         tom_resposta = (request.form.get('tom_resposta') or '').strip()
         mensagem_transbordo = (request.form.get('mensagem_transbordo') or '').strip()
         roteiro_menu_texto = (request.form.get('roteiro_menu') or '').strip()
+        mensagens_etapa = {
+            etapa.id: (request.form.get(f'mensagem_etapa_{etapa.id}') or '').strip()
+            for etapa in etapas
+        }
         roteiro_menu = None
 
         if not mensagem_saudacao or len(mensagem_saudacao) > 2000:
@@ -1049,6 +1053,8 @@ def configuracoes_bot():
             erro = 'Escolha um tom.'
         elif not mensagem_transbordo or len(mensagem_transbordo) > 500:
             erro = 'Mensagem de transbordo inválida.'
+        elif any(len(mensagem) > 2000 for mensagem in mensagens_etapa.values()):
+            erro = 'As mensagens das etapas devem ter no máximo 2000 caracteres.'
 
         if not erro:
             try:
@@ -1063,6 +1069,7 @@ def configuracoes_bot():
             'prompt_personalidade': prompt_personalidade,
             'tom_resposta': tom_resposta,
             'mensagem_transbordo': mensagem_transbordo,
+            'mensagens_etapa': mensagens_etapa,
         }
         if erro:
             return render_template(
@@ -1080,6 +1087,8 @@ def configuracoes_bot():
         empresa.prompt_personalidade = prompt_personalidade
         empresa.tom_resposta = tom_resposta
         empresa.mensagem_transbordo = mensagem_transbordo
+        for etapa in etapas:
+            etapa.mensagem_etapa = mensagens_etapa[etapa.id] or None
         try:
             db.session.commit()
         except Exception:
