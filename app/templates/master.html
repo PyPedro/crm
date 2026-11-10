@@ -327,12 +327,12 @@
         </div>
     </div>
 
-    <!-- MODAL: Respostas Automáticas e Inteligência Artificial -->
+    <!-- MODAL: Roteiro e respostas automáticas -->
     <div id="modal-config-ia" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col border border-slate-200">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <div>
-                    <h3 class="font-bold text-slate-800 text-lg">Respostas Automáticas e Inteligência Artificial</h3>
+                    <h3 class="font-bold text-slate-800 text-lg">Roteiro numérico e configurações</h3>
                     <p id="ia-empresa-nome" class="text-xs font-semibold text-indigo-600 mt-0.5">Empresa</p>
                 </div>
                 <button type="button" onclick="document.getElementById('modal-config-ia').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
@@ -340,13 +340,19 @@
             
             <div class="p-6 overflow-y-auto space-y-5 flex-1">
                 <input type="hidden" id="ia_empresa_id">
+
+                <div>
+                    <label for="ia_roteiro_menu" class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Árvore do roteiro numérico (JSON)</label>
+                    <p class="text-[11px] leading-5 text-slate-600 mb-2">Cada opção aponta para uma etapa e para o próximo nó; <code>null</code> encerra o roteiro e transfere para a equipe. A IA permanece desativada.</p>
+                    <textarea id="ia_roteiro_menu" rows="12" spellcheck="false" class="w-full rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 font-mono text-xs leading-5 text-emerald-100"></textarea>
+                </div>
                 
                 <!-- SECÇÃO: PERGUNTAS E RESPOSTAS (FUNCIONA COM E SEM IA) -->
                 <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
                     <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
                         <div>
                             <h4 class="text-xs font-bold text-indigo-950 uppercase tracking-wider">Perguntas e Respostas da Empresa (Atendimento Garantido)</h4>
-                            <p class="text-[11px] text-slate-600 mt-0.5">Perguntas reconhecidas recebem estas respostas diretamente pelo sistema, sem depender de serviços de IA. A IA só é usada quando nenhuma pergunta cadastrada corresponde.</p>
+                            <p class="text-[11px] text-slate-600 mt-0.5">Mantidas para compatibilidade; o atendimento automático atual segue exclusivamente o roteiro numérico.</p>
                         </div>
                         <button type="button" onclick="adicionarCampoFAQ()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer">
                             + Nova Pergunta
@@ -568,6 +574,7 @@
             document.getElementById('ia_saudacao').value = 'Carregando...';
             document.getElementById('ia_transbordo').value = 'Carregando...';
             document.getElementById('ia_personalidade').value = 'Carregando...';
+            document.getElementById('ia_roteiro_menu').value = 'Carregando...';
 
             const container = document.getElementById('faq-container');
             container.innerHTML = '<p class="text-xs text-slate-400 py-2">Carregando perguntas e respostas...</p>';
@@ -583,6 +590,7 @@
                 document.getElementById('ia_saudacao').value = data.mensagem_saudacao || '';
                 document.getElementById('ia_transbordo').value = data.mensagem_transbordo || '';
                 document.getElementById('ia_personalidade').value = data.prompt_personalidade || '';
+                document.getElementById('ia_roteiro_menu').value = JSON.stringify(data.roteiro_menu, null, 2);
 
                 container.innerHTML = '';
                 if (data.faqs && data.faqs.length > 0) {
@@ -612,11 +620,22 @@
                 }
             });
 
+            let roteiroMenu;
+            try {
+                roteiroMenu = JSON.parse(document.getElementById('ia_roteiro_menu').value);
+            } catch (erro) {
+                alert('O roteiro precisa ser um JSON válido.');
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+                return;
+            }
+
             const payload = {
                 tom_resposta: document.getElementById('ia_tom').value,
                 mensagem_saudacao: document.getElementById('ia_saudacao').value,
                 mensagem_transbordo: document.getElementById('ia_transbordo').value,
                 prompt_personalidade: document.getElementById('ia_personalidade').value,
+                roteiro_menu: roteiroMenu,
                 faqs: faqs
             };
 
@@ -631,7 +650,8 @@
                     alert("FAQs e configurações atualizadas com sucesso!");
                     document.getElementById('modal-config-ia').classList.add('hidden');
                 } else {
-                    alert("Erro ao salvar.");
+                    const data = await res.json();
+                    alert(data.erro || "Erro ao salvar.");
                 }
             } catch (e) {
                 alert("Erro de conexão.");

@@ -89,6 +89,7 @@ def create_app(config_overrides=None):
         migrations = {
             'empresa': {
                 'usar_menu_inicial': 'BOOLEAN NOT NULL DEFAULT FALSE',
+                'roteiro_menu': 'TEXT',
                 'mensagem_saudacao': "TEXT NOT NULL DEFAULT 'Olá! Como podemos ajudar hoje?'",
                 'prompt_personalidade': "TEXT NOT NULL DEFAULT 'Responda de forma curta, direta e amigável.'",
                 'tom_resposta': "VARCHAR(50) NOT NULL DEFAULT 'Profissional'",
@@ -101,6 +102,7 @@ def create_app(config_overrides=None):
             'pessoa': {
                 'ia_ativa': 'BOOLEAN NOT NULL DEFAULT TRUE',
                 'status_atendimento': "VARCHAR(20) NOT NULL DEFAULT 'ia'",
+                'roteiro_no_atual': 'VARCHAR(100)',
             },
         }
         existing_columns = {

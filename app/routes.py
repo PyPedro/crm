@@ -58,6 +58,138 @@ def get_serializer():
     return URLSafeTimedSerializer(current_app.config.get('SECRET_KEY', 'optmiza-secure-key-2026'))
 
 
+def _roteiro_menu_padrao(etapas):
+    etapas_menu = [etapa for etapa in etapas if etapa.exibir_no_menu]
+    etapas_menu = etapas_menu or etapas
+    opcoes = []
+    numeros_usados = set()
+    proximo_numero = 1
+    for etapa in etapas_menu:
+        numero = etapa.numero_menu
+        if not isinstance(numero, int) or numero < 1 or numero > 9 or numero in numeros_usados:
+            while proximo_numero in numeros_usados:
+                proximo_numero += 1
+            numero = proximo_numero
+        if numero > 9:
+            break
+        numeros_usados.add(numero)
+        opcoes.append({
+            "numero": numero,
+            "texto": etapa.nome,
+            "etapa_id": etapa.id,
+            "proximo_no": None,
+        })
+    return {"no_inicial": "inicio", "nos": [{
+        "id": "inicio",
+        "mensagem": "Como podemos ajudar?",
+        "opcoes": opcoes,
+    }]}
+
+
+def _validar_roteiro_menu(roteiro, etapas):
+    if not isinstance(roteiro, dict):
+        return None, "O roteiro deve ser um objeto JSON."
+    no_inicial = roteiro.get('no_inicial')
+    nos_lista = roteiro.get('nos')
+    if not isinstance(no_inicial, str) or not isinstance(nos_lista, list) or not nos_lista:
+        return None, "Informe o nó inicial e ao menos um nó no roteiro."
+    if len(nos_lista) > 100:
+        return None, "O roteiro pode ter no máximo 100 nós."
+
+    etapa_ids = {etapa.id for etapa in etapas}
+    nos = {}
+    for indice, no in enumerate(nos_lista, 1):
+        if not isinstance(no, dict):
+            return None, f"O nó {indice} do roteiro é inválido."
+        no_id = no.get('id')
+        mensagem = no.get('mensagem')
+        opcoes = no.get('opcoes')
+        if not isinstance(no_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', no_id):
+            return None, f"O identificador do nó {indice} é inválido."
+        if no_id in nos:
+            return None, f"O identificador de nó {no_id} está repetido."
+        if not isinstance(mensagem, str) or not mensagem.strip() or len(mensagem) > 2000:
+            return None, f"O nó {no_id} precisa de uma mensagem de até 2000 caracteres."
+        if not isinstance(opcoes, list) or not 1 <= len(opcoes) <= 9:
+            return None, f"O nó {no_id} precisa ter entre 1 e 9 opções."
+
+        opcoes_normalizadas = []
+        numeros_usados = set()
+        for opcao_indice, opcao in enumerate(opcoes, 1):
+            if not isinstance(opcao, dict):
+                return None, f"A opção {opcao_indice} do nó {no_id} é inválida."
+            numero = opcao.get('numero')
+            texto = opcao.get('texto')
+            etapa_id = opcao.get('etapa_id')
+            proximo_no = opcao.get('proximo_no')
+            if isinstance(numero, bool) or not isinstance(numero, int) or not 1 <= numero <= 9 or numero in numeros_usados:
+                return None, f"Os números das opções do nó {no_id} devem ser únicos, de 1 a 9."
+            if not isinstance(texto, str) or not texto.strip() or len(texto) > 200:
+                return None, f"A opção {numero} do nó {no_id} precisa de um texto de até 200 caracteres."
+            if isinstance(etapa_id, bool) or not isinstance(etapa_id, int) or etapa_id not in etapa_ids:
+                return None, f"A opção {numero} do nó {no_id} aponta para uma etapa inexistente."
+            if proximo_no is not None and (
+                not isinstance(proximo_no, str)
+                or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', proximo_no)
+            ):
+                return None, f"O próximo nó da opção {numero} do nó {no_id} é inválido."
+            numeros_usados.add(numero)
+            opcoes_normalizadas.append({
+                "numero": numero,
+                "texto": texto.strip(),
+                "etapa_id": etapa_id,
+                "proximo_no": proximo_no,
+            })
+        nos[no_id] = {
+            "id": no_id,
+            "mensagem": mensagem.strip(),
+            "opcoes": opcoes_normalizadas,
+        }
+
+    if no_inicial not in nos:
+        return None, "O nó inicial não existe no roteiro."
+
+    pais = {no_id: 0 for no_id in nos}
+    for no in nos.values():
+        for opcao in no['opcoes']:
+            proximo_no = opcao['proximo_no']
+            if proximo_no is None:
+                continue
+            if proximo_no not in nos:
+                return None, f"A opção aponta para o nó inexistente {proximo_no}."
+            pais[proximo_no] += 1
+            if pais[proximo_no] > 1:
+                return None, f"O nó {proximo_no} deve ter apenas uma opção de entrada."
+    if pais[no_inicial] != 0:
+        return None, "O nó inicial não pode ser destino de outra opção."
+    if any(pais[no_id] != 1 for no_id in nos if no_id != no_inicial):
+        return None, "Todos os nós devem estar ligados ao nó inicial."
+
+    visitados = set()
+    em_visita = set()
+
+    def visitar(no_id):
+        if no_id in em_visita:
+            return False
+        if no_id in visitados:
+            return True
+        em_visita.add(no_id)
+        for opcao in nos[no_id]['opcoes']:
+            destino = opcao['proximo_no']
+            if destino is not None and not visitar(destino):
+                return False
+        em_visita.remove(no_id)
+        visitados.add(no_id)
+        return True
+
+    if not visitar(no_inicial):
+        return None, "O roteiro não pode conter ciclos."
+    if len(visitados) != len(nos):
+        return None, "Todos os nós devem estar ligados ao nó inicial."
+
+    return {"no_inicial": no_inicial, "nos": list(nos.values())}, None
+
+
 def slug_instancia(nome_empresa):
     normalizado = unicodedata.normalize('NFKD', nome_empresa).encode('ascii', 'ignore').decode('ascii')
     base = re.sub(r'[^a-zA-Z0-9]+', '-', normalizado).strip('-').lower() or 'empresa'
@@ -496,15 +628,29 @@ def admin_config_empresa(id):
     if request.method == 'GET':
         regras = RespostaAutomatica.query.filter_by(empresa_id=empresa.id).order_by(RespostaAutomatica.id).all()
         faqs_lista = [{"id": r.id, "pergunta": r.palavra_chave, "resposta": r.resposta} for r in regras]
+        etapas = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).all()
+        try:
+            roteiro_menu = json.loads(empresa.roteiro_menu) if empresa.roteiro_menu else _roteiro_menu_padrao(etapas)
+        except ValueError:
+            current_app.logger.exception('Roteiro numérico inválido para a empresa %s.', empresa.id)
+            return jsonify({"erro": "O roteiro salvo está inválido; corrija-o nas configurações do atendimento."}), 409
         return jsonify({
             "tom_resposta": empresa.tom_resposta or 'Profissional',
             "mensagem_saudacao": empresa.mensagem_saudacao or '',
             "mensagem_transbordo": empresa.mensagem_transbordo or '',
             "prompt_personalidade": empresa.prompt_personalidade or '',
             "faqs": faqs_lista,
+            "roteiro_menu": roteiro_menu,
         })
         
     dados = request.get_json(silent=True) or {}
+    if 'roteiro_menu' in dados:
+        etapas = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).all()
+        roteiro_menu, erro = _validar_roteiro_menu(dados['roteiro_menu'], etapas)
+        if erro:
+            return jsonify({"erro": erro}), 400
+        empresa.roteiro_menu = json.dumps(roteiro_menu, ensure_ascii=False)
+        empresa.usar_menu_inicial = True
     empresa.tom_resposta = dados.get('tom_resposta', empresa.tom_resposta)
     empresa.mensagem_saudacao = dados.get('mensagem_saudacao', empresa.mensagem_saudacao)
     empresa.mensagem_transbordo = dados.get('mensagem_transbordo', empresa.mensagem_transbordo)
@@ -882,6 +1028,9 @@ def configuracoes_bot():
         return 'Acesso negado.', 403
     empresa = db.session.get(Empresa, current_user.empresa_id)
     etapas = Etapa.query.filter_by(empresa_id=empresa.id).order_by(Etapa.id).all()
+    roteiro_menu_texto = empresa.roteiro_menu or json.dumps(
+        _roteiro_menu_padrao(etapas), ensure_ascii=False, indent=2
+    )
     erro, form_values = None, {}
 
     if request.method == 'POST':
@@ -889,8 +1038,8 @@ def configuracoes_bot():
         prompt_personalidade = (request.form.get('prompt_personalidade') or '').strip() or 'Responda de forma curta, direta e amigável.'
         tom_resposta = (request.form.get('tom_resposta') or '').strip()
         mensagem_transbordo = (request.form.get('mensagem_transbordo') or '').strip()
-        usar_menu = request.form.get('usar_menu_inicial') == 'on'
-        etapas_menu, ids_exibidos = {}, set(request.form.getlist('etapa_exibir_no_menu'))
+        roteiro_menu_texto = (request.form.get('roteiro_menu') or '').strip()
+        roteiro_menu = None
 
         if not mensagem_saudacao or len(mensagem_saudacao) > 2000:
             erro = 'Saudação inválida.'
@@ -900,43 +1049,57 @@ def configuracoes_bot():
             erro = 'Escolha um tom.'
         elif not mensagem_transbordo or len(mensagem_transbordo) > 500:
             erro = 'Mensagem de transbordo inválida.'
-        else:
-            numeros_usados = set()
-            for etapa in etapas:
-                if str(etapa.id) not in ids_exibidos:
-                    etapas_menu[etapa.id] = None
-                    continue
-                if len(numeros_usados) >= 9:
-                    erro = 'Máximo 9 etapas.'
-                    break
-                try:
-                    numero_int = int((request.form.get(f'etapa_numero_{etapa.id}') or '').strip())
-                except Exception:
-                    erro = 'Etapa precisa de número.'
-                    break
-                if numero_int < 1 or numero_int > 9 or numero_int in numeros_usados:
-                    erro = 'Números inválidos ou repetidos.'
-                    break
-                numeros_usados.add(numero_int)
-                etapas_menu[etapa.id] = numero_int
-            if not erro and usar_menu and not numeros_usados:
-                erro = 'Selecione ao menos uma etapa para o menu.'
 
-        form_values = {'mensagem_saudacao': mensagem_saudacao, 'prompt_personalidade': prompt_personalidade, 'tom_resposta': tom_resposta, 'mensagem_transbordo': mensagem_transbordo, 'etapas_menu': etapas_menu}
+        if not erro:
+            try:
+                roteiro_bruto = json.loads(roteiro_menu_texto)
+            except (TypeError, ValueError):
+                erro = 'O roteiro numérico precisa ser um JSON válido.'
+            else:
+                roteiro_menu, erro = _validar_roteiro_menu(roteiro_bruto, etapas)
+
+        form_values = {
+            'mensagem_saudacao': mensagem_saudacao,
+            'prompt_personalidade': prompt_personalidade,
+            'tom_resposta': tom_resposta,
+            'mensagem_transbordo': mensagem_transbordo,
+        }
         if erro:
-            return render_template('configuracoes.html', empresa=empresa, etapas=etapas, erro=erro, form_ativar=usar_menu, form_values=form_values), 400
+            return render_template(
+                'configuracoes.html',
+                empresa=empresa,
+                etapas=etapas,
+                erro=erro,
+                form_values=form_values,
+                roteiro_menu_texto=roteiro_menu_texto,
+            ), 400
 
-        empresa.usar_menu_inicial, empresa.mensagem_saudacao, empresa.prompt_personalidade, empresa.tom_resposta, empresa.mensagem_transbordo = usar_menu, mensagem_saudacao, prompt_personalidade, tom_resposta, mensagem_transbordo
-        for etapa in etapas:
-            etapa.exibir_no_menu = etapas_menu.get(etapa.id) is not None
-            etapa.numero_menu = etapas_menu.get(etapa.id)
+        empresa.usar_menu_inicial = True
+        empresa.roteiro_menu = json.dumps(roteiro_menu, ensure_ascii=False)
+        empresa.mensagem_saudacao = mensagem_saudacao
+        empresa.prompt_personalidade = prompt_personalidade
+        empresa.tom_resposta = tom_resposta
+        empresa.mensagem_transbordo = mensagem_transbordo
         try:
             db.session.commit()
         except Exception:
             db.session.rollback()
-            return render_template('configuracoes.html', empresa=empresa, etapas=etapas, erro='Erro ao salvar.', form_ativar=usar_menu, form_values=form_values), 409
+            return render_template(
+                'configuracoes.html',
+                empresa=empresa,
+                etapas=etapas,
+                erro='Erro ao salvar.',
+                form_values=form_values,
+                roteiro_menu_texto=roteiro_menu_texto,
+            ), 409
         return redirect(url_for('main.configuracoes_bot', salvo=1))
-    return render_template('configuracoes.html', empresa=empresa, etapas=etapas, salvo=request.args.get('salvo') == '1')
+    return render_template(
+        'configuracoes.html',
+        empresa=empresa,
+        etapas=etapas,
+        salvo=request.args.get('salvo') == '1',
+        roteiro_menu_texto=roteiro_menu_texto,
+    )
 
 
 @bp.route('/api/configuracoes', methods=['GET', 'POST'])
@@ -1032,7 +1195,13 @@ def criar_lead():
 
     pessoa = Pessoa.query.filter_by(empresa_id=current_user.empresa_id, telefone=telefone).first()
     if not pessoa:
-        pessoa = Pessoa(empresa_id=current_user.empresa_id, nome=nome, telefone=telefone, status_atendimento='menu' if current_user.empresa.usar_menu_inicial else 'ia')
+        pessoa = Pessoa(
+            empresa_id=current_user.empresa_id,
+            nome=nome,
+            telefone=telefone,
+            status_atendimento='menu',
+            ia_ativa=False,
+        )
         db.session.add(pessoa)
         db.session.flush()
 
@@ -1122,10 +1291,15 @@ def atualizar_etiquetas_conversa(pessoa_id):
 def atualizar_assistente_conversa(pessoa_id):
     pessoa = Pessoa.query.filter_by(id=pessoa_id, empresa_id=current_user.empresa_id).first()
     if pessoa:
-        ativa = request.get_json(silent=True).get('ativa')
-        pessoa.ia_ativa, pessoa.status_atendimento = ativa, 'ia' if ativa else 'humano'
+        dados = request.get_json(silent=True) or {}
+        ativa = dados.get('ativa')
+        if ativa is True:
+            return jsonify({"erro": "A assistência por IA está desativada; use o roteiro numérico."}), 409
+        if not isinstance(ativa, bool):
+            return jsonify({"erro": "Estado do assistente inválido."}), 400
+        pessoa.ia_ativa, pessoa.status_atendimento = False, 'humano'
         db.session.commit()
-        return jsonify({"status": "sucesso", "ia_ativa": pessoa.ia_ativa})
+        return jsonify({"status": "sucesso", "ia_ativa": False})
     return jsonify({"erro": "Não encontrado"}), 404
 
 

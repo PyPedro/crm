@@ -10,7 +10,6 @@ import requests
 from flask import current_app
 from celery.signals import worker_process_init
 from google.genai import types
-
 from app import celery, db
 from app.models import (
     FUSO_HORARIO_BR,
@@ -65,13 +64,6 @@ def _normalizar_texto(texto):
     return re.sub(r'\s+', ' ', texto).strip()
 
 
-def _extrair_palavras_relevantes(texto_norm):
-    return {
-        p for p in texto_norm.split()
-        if len(p) > 2 and p not in STOPWORDS_PT
-    }
-
-
 def _personalizar_mensagem(texto, empresa, pessoa):
     nome_cli = pessoa.nome if (pessoa.nome and pessoa.nome != 'Novo Contato') else 'Cliente'
     return (texto or '').replace(
@@ -79,17 +71,95 @@ def _personalizar_mensagem(texto, empresa, pessoa):
     ).replace('{nome_empresa}', empresa.nome or '')
 
 
-def _montar_texto_menu(empresa, pessoa):
+def _extrair_palavras_relevantes(texto_norm):
+    return {
+        p for p in texto_norm.split()
+        if len(p) > 2 and p not in STOPWORDS_PT
+    }
+
+
+def _carregar_roteiro_menu(empresa):
+    if empresa.roteiro_menu:
+        try:
+            roteiro = json.loads(empresa.roteiro_menu)
+        except (TypeError, ValueError) as erro:
+            raise RuntimeError(
+                f'Roteiro numérico inválido para a empresa {empresa.id}.'
+            ) from erro
+        if not isinstance(roteiro, dict) or not isinstance(roteiro.get('nos'), list):
+            raise RuntimeError(f'Roteiro numérico inválido para a empresa {empresa.id}.')
+        nos = {
+            no.get('id'): no for no in roteiro['nos']
+            if isinstance(no, dict) and isinstance(no.get('id'), str)
+        }
+        no_inicial = roteiro.get('no_inicial')
+        if no_inicial not in nos:
+            raise RuntimeError(f'O nó inicial do roteiro da empresa {empresa.id} não existe.')
+        return no_inicial, nos
+
     etapas = Etapa.query.filter_by(
-        empresa_id=empresa.id, exibir_no_menu=True
-    ).order_by(Etapa.numero_menu, Etapa.id).all()
-    linhas = [f'{etapa.numero_menu} - {etapa.nome}' for etapa in etapas]
-    saudacao = _personalizar_mensagem(
-        empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?',
-        empresa,
-        pessoa,
-    )
-    return f'{saudacao}\n\n' + '\n'.join(linhas) if linhas else saudacao
+        empresa_id=empresa.id
+    ).order_by(Etapa.id).all()
+    etapas_menu = [etapa for etapa in etapas if etapa.exibir_no_menu]
+    etapas_menu = etapas_menu or etapas
+    nos = []
+    numeros_usados = set()
+    numero_sequencial = 1
+    opcoes = []
+    for etapa in etapas_menu:
+        numero = etapa.numero_menu
+        if not isinstance(numero, int) or numero < 1 or numero > 9 or numero in numeros_usados:
+            while numero_sequencial in numeros_usados:
+                numero_sequencial += 1
+            numero = numero_sequencial
+        if numero > 9:
+            break
+        numeros_usados.add(numero)
+        opcoes.append({
+            'numero': numero,
+            'texto': etapa.nome,
+            'etapa_id': etapa.id,
+            'proximo_no': None,
+        })
+    nos.append({
+        'id': 'inicio',
+        'mensagem': 'Como podemos ajudar?',
+        'opcoes': opcoes,
+    })
+    return 'inicio', {'inicio': nos[0]}
+
+
+def _montar_texto_menu(empresa, pessoa, nos, no_id, incluir_saudacao=False):
+    no = nos.get(no_id)
+    if not no:
+        raise RuntimeError(f'O nó {no_id!r} não existe no roteiro da empresa {empresa.id}.')
+    partes = []
+    if incluir_saudacao:
+        saudacao = _personalizar_mensagem(
+            empresa.mensagem_saudacao or 'Olá! Como podemos ajudar hoje?',
+            empresa,
+            pessoa,
+        )
+        if saudacao:
+            partes.append(saudacao)
+    mensagem = _personalizar_mensagem(no.get('mensagem', ''), empresa, pessoa)
+    if mensagem:
+        partes.append(mensagem)
+    for opcao in no.get('opcoes', []):
+        partes.append(f"{opcao['numero']} - {opcao['texto']}")
+    return '\n\n'.join(partes)
+
+
+def _pediu_atendimento_humano(texto):
+    texto_norm = _normalizar_texto(texto)
+    return any(termo in texto_norm for termo in (
+        'atendente',
+        'atendimento humano',
+        'falar com humano',
+        'falar com alguem',
+        'falar com uma pessoa',
+        'pessoa real',
+    ))
 
 
 def _simular_digitacao(instancia, telefone, segundos=1.5):
@@ -483,11 +553,10 @@ def _processar_payload(payload):
     pessoa = Pessoa.query.filter_by(
         empresa_id=empresa.id, telefone=telefone
     ).first()
-    atendimento_reaberto = False
-    eh_novo_contato = False
+    iniciar_roteiro = False
 
     if not pessoa:
-        eh_novo_contato = True
+        iniciar_roteiro = True
         primeira_etapa = Etapa.query.filter_by(
             empresa_id=empresa.id
         ).order_by(Etapa.id).first()
@@ -497,8 +566,8 @@ def _processar_payload(payload):
             empresa_id=empresa.id,
             nome=data_payload.get('pushName', 'Novo Contato'),
             telefone=telefone,
-            status_atendimento='menu' if empresa.usar_menu_inicial else 'ia',
-            ia_ativa=True,
+            status_atendimento='menu',
+            ia_ativa=False,
         )
         db.session.add(pessoa)
         db.session.flush()
@@ -511,10 +580,19 @@ def _processar_payload(payload):
         ))
         db.session.commit()
     elif pessoa.status_atendimento == 'fechado':
-        pessoa.status_atendimento = 'menu' if empresa.usar_menu_inicial else 'ia'
-        pessoa.ia_ativa = True
-        atendimento_reaberto = True
+        pessoa.status_atendimento = 'menu'
+        pessoa.ia_ativa = False
+        pessoa.roteiro_no_atual = None
+        iniciar_roteiro = True
         db.session.commit()
+    elif pessoa.status_atendimento not in {'humano', 'menu'}:
+        pessoa.status_atendimento = 'menu'
+        pessoa.ia_ativa = False
+        pessoa.roteiro_no_atual = None
+        iniciar_roteiro = True
+        db.session.commit()
+    elif pessoa.status_atendimento == 'menu' and not pessoa.roteiro_no_atual:
+        iniciar_roteiro = True
 
     mensagem_db = texto_recebido
     if media_type:
@@ -547,94 +625,93 @@ def _processar_payload(payload):
     if pessoa.status_atendimento == 'humano':
         return 'human'
 
-    if (atendimento_reaberto or eh_novo_contato) and empresa.usar_menu_inicial:
+    no_inicial, nos = _carregar_roteiro_menu(empresa)
+    if iniciar_roteiro or pessoa.roteiro_no_atual not in nos:
+        pessoa.status_atendimento = 'menu'
+        pessoa.ia_ativa = False
+        pessoa.roteiro_no_atual = no_inicial
+        db.session.commit()
         _simular_digitacao(instancia, telefone, 1.2)
-        _enviar_resposta(
-            empresa.id, pessoa.id, telefone, instancia, _montar_texto_menu(empresa, pessoa)
+        texto_menu = _montar_texto_menu(
+            empresa, pessoa, nos, no_inicial, incluir_saudacao=True
         )
-        return 'menu_sent'
-
-    if pessoa.status_atendimento == 'menu':
-        texto_opcao = (texto_recebido or '').strip()
-        etapa = None
-        if texto_opcao.isdecimal():
-            etapa = Etapa.query.filter_by(
-                empresa_id=empresa.id, exibir_no_menu=True, numero_menu=int(texto_opcao)
-            ).first()
-        if etapa:
-            _simular_digitacao(instancia, telefone, 1.2)
-            negocio = Negocio.query.filter_by(
-                empresa_id=empresa.id, pessoa_id=pessoa.id
-            ).order_by(Negocio.id).first()
-            if negocio:
-                negocio.etapa_id = etapa.id
+        _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, texto_menu)
+        if _pediu_atendimento_humano(texto_recebido):
             _transferir_para_humano(
                 empresa, pessoa, telefone, instancia, empresa.mensagem_transbordo
             )
             return 'transferred'
+        return 'menu_sent'
 
-        pessoa.status_atendimento = 'ia'
-        db.session.commit()
-
-    # Respostas configuradas são determinísticas e não dependem de serviços de IA.
-    regras = RespostaAutomatica.query.filter_by(
-        empresa_id=empresa.id
-    ).order_by(RespostaAutomatica.id).all()
-    eh_primeira_interacao = eh_novo_contato or atendimento_reaberto
-    regra_direta = _buscar_melhor_faq(regras, texto_recebido)
-    if regra_direta:
-        _simular_digitacao(instancia, telefone, 1.8)
-        resposta_pronta = _personalizar_mensagem(regra_direta.resposta, empresa, pessoa)
-        if eh_primeira_interacao and empresa.mensagem_saudacao:
-            saudacao = _personalizar_mensagem(empresa.mensagem_saudacao, empresa, pessoa)
-            resposta_pronta = f'{saudacao}\n\n{resposta_pronta}'
-        _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, resposta_pronta)
-        return 'faq_simulated_replied'
-
-    if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
-        return 'ignored'
-
-    # Simula digitação humana no WhatsApp ("Digitando...")
-    _simular_digitacao(instancia, telefone, 1.8)
-
-    # PRIORIDADE 2: Se for a primeira mensagem e for apenas uma saudação ("Oi", "Bom dia"),
-    # envia a Primeira Mensagem (Saudação) configurada na empresa sem gastar API nem correr risco de erro
-    if (eh_primeira_interacao or _eh_apenas_saudacao(texto_recebido)) and empresa.mensagem_saudacao:
-        _, texto_saudacao = _simular_assistente_local(
-            empresa, pessoa, texto_recebido, regras, eh_primeira_interacao=True
+    if _pediu_atendimento_humano(texto_recebido):
+        _simular_digitacao(instancia, telefone, 1.2)
+        _transferir_para_humano(
+            empresa, pessoa, telefone, instancia, empresa.mensagem_transbordo
         )
-        _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, texto_saudacao)
-        return 'greeting_simulated_replied'
+        return 'transferred'
 
-    # PRIORIDADE 3: Tenta gerar resposta contextual com a IA (alimentada também pelas FAQs)
-    historico_genai, historico_dict, prompt_adicional = _preparar_contexto_ia(empresa, pessoa)
+    no_atual = nos.get(pessoa.roteiro_no_atual)
+    if not no_atual:
+        raise RuntimeError(
+            f'O nó atual {pessoa.roteiro_no_atual!r} não existe no roteiro da empresa {empresa.id}.'
+        )
+    texto_opcao = (texto_recebido or '').strip()
+    opcao = None
+    if texto_opcao.isdecimal():
+        opcao = next(
+            (item for item in no_atual.get('opcoes', [])
+             if item.get('numero') == int(texto_opcao)),
+            None,
+        )
+    if not opcao:
+        _simular_digitacao(instancia, telefone, 1.0)
+        _enviar_resposta(
+            empresa.id,
+            pessoa.id,
+            telefone,
+            instancia,
+            'Por favor, responda com o número de uma das opções acima.',
+        )
+        return 'menu_invalid_option'
+
+    etapa = Etapa.query.filter_by(
+        id=opcao.get('etapa_id'), empresa_id=empresa.id
+    ).first()
+    if not etapa:
+        raise RuntimeError(
+            f'A opção {opcao.get("numero")} do roteiro aponta para uma etapa inexistente.'
+        )
+    negocio = Negocio.query.filter_by(
+        empresa_id=empresa.id, pessoa_id=pessoa.id
+    ).order_by(Negocio.id).first()
+    if negocio:
+        negocio.etapa_id = etapa.id
+
+    proximo_no = opcao.get('proximo_no')
+    if proximo_no is None:
+        _simular_digitacao(instancia, telefone, 1.2)
+        _transferir_para_humano(
+            empresa, pessoa, telefone, instancia, empresa.mensagem_transbordo
+        )
+        return 'transferred'
+    if proximo_no not in nos:
+        raise RuntimeError(
+            f'A opção {opcao.get("numero")} aponta para o nó inexistente {proximo_no!r}.'
+        )
+
+    pessoa.status_atendimento = 'menu'
+    pessoa.ia_ativa = False
+    pessoa.roteiro_no_atual = proximo_no
     db.session.commit()
-
-    sucesso_ia, resposta_bot = _chamar_ia_com_fallback(
-        empresa, pessoa, texto_recebido, historico_genai, historico_dict, prompt_adicional, regras
+    _simular_digitacao(instancia, telefone, 1.2)
+    _enviar_resposta(
+        empresa.id,
+        pessoa.id,
+        telefone,
+        instancia,
+        _montar_texto_menu(empresa, pessoa, nos, proximo_no),
     )
-
-    if sucesso_ia and resposta_bot:
-        if '[TRANSFERIR]' in resposta_bot:
-            texto_limpo_ia = resposta_bot.replace('[TRANSFERIR]', '').strip()
-            msg_final = texto_limpo_ia if texto_limpo_ia else empresa.mensagem_transbordo
-            _transferir_para_humano(empresa, pessoa, telefone, instancia, msg_final)
-            return 'transferred'
-
-        _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, resposta_bot)
-        return 'replied'
-
-    # PRIORIDADE 4 (FALLBACK TOTAL SEM IA):
-    # Se não houver chave de IA ou se todas as IAs estiverem fora do ar, o próprio sistema simula o fluxo!
-    acao_local, resposta_local = _simular_assistente_local(
-        empresa, pessoa, texto_recebido, regras, eh_primeira_interacao
-    )
-    if acao_local == 'transfer':
-        _transferir_para_humano(empresa, pessoa, telefone, instancia, resposta_local)
-        return 'simulated_transferred'
-
-    _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, resposta_local)
-    return 'simulated_replied'
+    return 'menu_step'
 
 
 @celery.task(name='app.tasks.processar_mensagem_whatsapp')

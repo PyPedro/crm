@@ -23,6 +23,7 @@ class Empresa(db.Model):
     
     # Configurações do Bot de Atendimento
     usar_menu_inicial = db.Column(db.Boolean, default=False)
+    roteiro_menu = db.Column(db.Text, nullable=True)
     mensagem_saudacao = db.Column(db.Text, nullable=False, default="Olá! Bem-vindo ao nosso atendimento. Como podemos ajudar hoje?")
     prompt_personalidade = db.Column(db.Text, nullable=False, default="Você é um assistente virtual prestativo. Responda de forma curta, direta e amigável.")
     tom_resposta = db.Column(db.String(20), nullable=False, default="Profissional")
@@ -95,6 +96,7 @@ class Pessoa(db.Model):
     telefone = db.Column(db.String(20), nullable=False)
     status_atendimento = db.Column(db.String(20), default='humano')
     ia_ativa = db.Column(db.Boolean, default=False)
+    roteiro_no_atual = db.Column(db.String(100), nullable=True)
 
     negocios = db.relationship('Negocio', backref='pessoa', lazy=True)
     mensagens = db.relationship('Mensagem', backref='pessoa', lazy=True)
