@@ -40,6 +40,7 @@ def bloquear_empresa_suspensa():
 
     if current_user.is_super_admin and request.endpoint in {
         'main.optmiza_master', 'main.toggle_empresa',
+        'main.admin_usuarios_empresa', 'main.admin_gerar_reset_link_usuario',
         'main.admin_upload_logo_global', 'main.admin_apagar_logo_global',
         'main.admin_empresas_pendentes', 'main.admin_ativar_empresa', 'main.admin_nova_empresa',
         'main.admin_gerar_convite_empresa', 'main.admin_config_empresa', 'main.admin_branding_empresa'
@@ -420,6 +421,37 @@ def optmiza_master():
         total_usuarios=total_usuarios,
         csrf_token=csrf_token,
     )
+
+
+@bp.route('/optmiza-master/empresa/<int:id>/usuarios', methods=['GET'])
+@login_required
+def admin_usuarios_empresa(id):
+    if not current_user.is_super_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
+    empresa = db.session.get(Empresa, id)
+    if not empresa:
+        return jsonify({"erro": "Empresa não encontrada"}), 404
+    usuarios = User.query.filter_by(empresa_id=empresa.id).order_by(User.id).all()
+    return jsonify([{
+        "id": usuario.id,
+        "username": usuario.username,
+        "email": usuario.email,
+        "is_admin": usuario.is_admin,
+    } for usuario in usuarios])
+
+
+@bp.route('/optmiza-master/usuarios/<int:user_id>/reset_link', methods=['POST'])
+@login_required
+def admin_gerar_reset_link_usuario(user_id):
+    if not current_user.is_super_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
+    usuario = db.session.get(User, user_id)
+    if not usuario:
+        return jsonify({"erro": "Utilizador não encontrado"}), 404
+    token = get_serializer().dumps({"user_id": usuario.id, "action": "reset"})
+    return jsonify({
+        "link": url_for('main.processar_reset', token=token, _external=True)
+    })
 
 
 @bp.route('/optmiza-master/empresa/<int:id>/toggle', methods=['POST'])

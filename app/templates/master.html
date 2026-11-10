@@ -140,6 +140,15 @@
                             <!-- COLUNA DE AÇÕES -->
                             <td class="p-5">
                                 <div class="flex items-center justify-end gap-2 flex-wrap">
+                                    <button type="button"
+                                        data-id="{{ empresa.id }}"
+                                        data-nome="{{ empresa.nome }}"
+                                        onclick="abrirModalUsuariosMaster(this.dataset.id, this.dataset.nome)"
+                                        class="bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                                        title="Ver utilizadores desta empresa">
+                                        Utilizadores
+                                    </button>
+
                                     <!-- Botão Personalizar Terminal (Logo, Cor Primária e Imagem de Fundo) -->
                                     <button type="button"
                                         data-id="{{ empresa.id }}"
@@ -381,6 +390,22 @@
         </div>
     </div>
 
+    <!-- MODAL: Utilizadores da Empresa -->
+    <div id="modal-usuarios-empresa" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="usuarios-empresa-titulo">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[85vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                <div>
+                    <h3 id="usuarios-empresa-titulo" class="font-bold text-slate-800">Utilizadores</h3>
+                    <p id="usuarios-empresa-nome" class="text-xs text-slate-500 mt-1"></p>
+                </div>
+                <button type="button" onclick="fecharModalUsuariosMaster()" aria-label="Fechar utilizadores" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+            </div>
+            <div id="usuarios-empresa-lista" class="p-4 sm:p-6 overflow-y-auto space-y-3" aria-live="polite">
+                <p class="text-sm text-slate-500 text-center py-6">Selecione uma empresa para carregar os utilizadores.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPTS MESTRES -->
     <script>
         function escaparHtml(str) {
@@ -389,6 +414,98 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
+        }
+
+        function fecharModalUsuariosMaster() {
+            document.getElementById('modal-usuarios-empresa').classList.add('hidden');
+            document.getElementById('modal-usuarios-empresa').classList.remove('flex');
+        }
+
+        async function abrirModalUsuariosMaster(empresaId, empresaNome) {
+            const modal = document.getElementById('modal-usuarios-empresa');
+            const lista = document.getElementById('usuarios-empresa-lista');
+            document.getElementById('usuarios-empresa-nome').textContent = empresaNome;
+            lista.innerHTML = '<p class="text-sm text-slate-500 text-center py-6">A carregar utilizadores...</p>';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            try {
+                const resposta = await fetch(`/optmiza-master/empresa/${encodeURIComponent(empresaId)}/usuarios`);
+                const dados = await resposta.json();
+                if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível carregar os utilizadores.');
+
+                lista.replaceChildren();
+                if (dados.length === 0) {
+                    lista.innerHTML = '<p class="text-sm text-slate-500 text-center py-6">Esta empresa ainda não tem utilizadores.</p>';
+                    return;
+                }
+
+                dados.forEach(usuario => {
+                    const item = document.createElement('div');
+                    item.className = 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4';
+
+                    const identificacao = document.createElement('div');
+                    identificacao.className = 'min-w-0';
+                    const nome = document.createElement('p');
+                    nome.className = 'break-all text-sm font-bold text-slate-800';
+                    nome.textContent = usuario.username || 'Utilizador';
+                    identificacao.appendChild(nome);
+
+                    const email = document.createElement('p');
+                    email.className = 'break-all text-xs text-slate-500 mt-1';
+                    email.textContent = usuario.email || 'Sem e-mail associado';
+                    identificacao.appendChild(email);
+
+                    const perfil = document.createElement('span');
+                    perfil.className = 'inline-block mt-2 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ' +
+                        (usuario.is_admin ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600');
+                    perfil.textContent = usuario.is_admin ? 'Admin' : 'Utilizador';
+                    identificacao.appendChild(perfil);
+
+                    const recuperar = document.createElement('button');
+                    recuperar.type = 'button';
+                    recuperar.className = 'min-h-10 shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60';
+                    recuperar.textContent = 'Recuperar Senha';
+                    recuperar.addEventListener('click', () => gerarLinkResetMaster(usuario.id, recuperar));
+
+                    item.append(identificacao, recuperar);
+                    lista.appendChild(item);
+                });
+            } catch (erro) {
+                lista.innerHTML = '';
+                const mensagem = document.createElement('p');
+                mensagem.className = 'text-sm text-red-600 text-center py-6';
+                mensagem.textContent = erro.message || 'Falha ao carregar utilizadores.';
+                lista.appendChild(mensagem);
+            }
+        }
+
+        async function gerarLinkResetMaster(userId, botao) {
+            const textoOriginal = botao.textContent;
+            botao.disabled = true;
+            botao.textContent = 'A gerar...';
+            try {
+                const resposta = await fetch(`/optmiza-master/usuarios/${encodeURIComponent(userId)}/reset_link`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.link) {
+                    throw new Error(dados.erro || 'Não foi possível gerar o link de recuperação.');
+                }
+
+                try {
+                    await navigator.clipboard.writeText(dados.link);
+                    alert('Link de recuperação gerado e copiado para a área de transferência.');
+                } catch (erroClipboard) {
+                    prompt('Link gerado. Copie o endereço abaixo:', dados.link);
+                }
+            } catch (erro) {
+                alert(erro.message || 'Erro de conexão ao gerar link de recuperação.');
+            } finally {
+                botao.disabled = false;
+                botao.textContent = textoOriginal;
+            }
         }
 
         function abrirModalBranding(empresaId, empresaNome, corAtual) {
