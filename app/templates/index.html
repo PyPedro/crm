@@ -46,6 +46,11 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        #kanban-board {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+            scroll-behavior: smooth;
+        }
     </style>
 </head>
 <body class="h-screen flex font-sans overflow-hidden text-slate-800">
@@ -53,32 +58,32 @@
     {% include 'sidebar.html' %}
 
     <!-- ÁREA PRINCIPAL -->
-    <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-        <header class="h-20 px-8 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-200/60 z-10 flex-shrink-0">
-            <div class="flex items-center gap-4">
+    <div class="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative">
+        <header class="min-h-20 px-4 py-3 md:h-20 md:px-8 md:py-0 flex flex-wrap justify-between items-center gap-y-3 bg-white/80 backdrop-blur-md border-b border-slate-200/60 z-10 flex-shrink-0">
+            <div class="min-w-0 flex items-center gap-2 md:gap-4">
                 {% if current_user.is_authenticated and current_user.empresa and current_user.empresa.logo_b64 %}
                 <div class="h-11 w-auto max-w-[140px] bg-white border border-slate-200/80 rounded-xl p-1.5 flex items-center justify-center shadow-sm">
                     <img src="{{ current_user.empresa.logo_b64 }}" alt="Logo {{ current_user.empresa.nome }}" class="max-h-full max-w-full object-contain">
                 </div>
                 {% endif %}
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Jornada do Cliente</h1>
-                    <p class="text-sm text-slate-500 font-medium mt-0.5">
+                    <h1 class="text-lg md:text-2xl font-bold text-slate-800 tracking-tight">Jornada do Cliente</h1>
+                    <p class="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
                         Gestão de oportunidades {{ current_user.empresa.nome if current_user.is_authenticated and current_user.empresa else 'Optmiza' }}
                     </p>
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
-                <button type="button" onclick="abrirModalLead()" class="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 shadow-sm">
+            <div class="ml-auto flex flex-wrap items-center justify-end gap-2 md:gap-3">
+                <button type="button" onclick="abrirModalLead()" class="min-h-10 flex items-center gap-2 rounded-lg bg-brand-600 px-3 md:px-4 py-2.5 text-xs md:text-sm font-semibold text-white transition hover:bg-brand-700 shadow-sm">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m-7-7h14"/></svg>
                     <span>Novo lead</span>
                 </button>
-                <div class="flex items-center bg-white border border-slate-200 rounded-full py-1.5 px-4 shadow-sm">
-                    <div class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs mr-3">
+                <div class="flex items-center bg-white border border-slate-200 rounded-full py-1.5 px-2 md:px-4 shadow-sm">
+                    <div class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs mr-2 md:mr-3">
                         {{ current_user.username[0]|upper }}
                     </div>
-                    <span class="text-sm font-semibold text-slate-700 mr-2">{{ current_user.username }}</span>
+                    <span class="text-xs md:text-sm font-semibold text-slate-700 mr-1 md:mr-2">{{ current_user.username }}</span>
                     {% if current_user.is_admin %}
                     <span class="bg-slate-100 text-slate-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider">Admin</span>
                     {% endif %}
@@ -87,13 +92,13 @@
         </header>
 
         <!-- KANBAN BOARD -->
-        <main id="kanban-board" class="flex-1 overflow-x-auto p-8 flex space-x-6 items-start">
+        <main id="kanban-board" class="min-w-0 flex-1 overflow-x-auto overscroll-x-contain touch-pan-x p-4 md:p-8 flex flex-nowrap gap-4 md:gap-6 items-start">
             {% for etapa in etapas %}
-            <div class="bg-white/75 backdrop-blur-md rounded-[1.25rem] w-[320px] flex-shrink-0 flex flex-col max-h-full border border-white/60 shadow-md">
+            <div class="bg-white/75 backdrop-blur-md rounded-[1.25rem] w-[300px] min-w-[300px] md:w-[320px] md:min-w-[320px] flex-shrink-0 flex flex-col max-h-full border border-white/60 shadow-md">
                 <div class="p-4 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-brand-500"></div>
-                        <h2 class="font-bold text-slate-700 text-sm">{{ etapa.nome }}</h2>
+                        <h2 class="break-words font-bold text-slate-700 text-sm">{{ etapa.nome }}</h2>
                     </div>
                     {% set negocios_ativos = etapa.negocios|rejectattr('pessoa.status_atendimento', 'equalto', 'fechado')|list %}
                     <span class="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">{{ negocios_ativos|length }}</span>
@@ -103,7 +108,7 @@
                     {% for negocio in negocios_ativos %}
                         {% if current_user.is_admin or negocio.user_id == current_user.id or not negocio.user_id %}
                         
-                        <div class="relative bg-white p-4 rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.06)] border border-slate-100 cursor-pointer hover:shadow-md hover:border-brand-200 transition-all group" 
+                        <div class="relative min-h-[150px] bg-white p-4 rounded-xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.06)] border border-slate-100 cursor-pointer hover:shadow-md hover:border-brand-200 transition-all group"
                              data-negocio-id="{{ negocio.id }}"
                              data-pessoa-id="{{ negocio.pessoa.id }}"
                              data-nome="{{ negocio.pessoa.nome }}"
@@ -116,8 +121,8 @@
                             
                             <div class="flex justify-between items-start mb-3">
                                 <div class="pr-4">
-                                    <h3 class="font-bold text-slate-800 text-sm leading-tight">{{ negocio.titulo }}</h3>
-                                    <p class="text-xs text-slate-500 mt-1 font-medium">{{ negocio.pessoa.nome }}</p>
+                                    <h3 class="break-words [overflow-wrap:anywhere] font-bold text-slate-800 text-sm leading-5">{{ negocio.titulo }}</h3>
+                                    <p class="break-words [overflow-wrap:anywhere] text-xs text-slate-500 mt-1 font-medium leading-5">{{ negocio.pessoa.nome }}</p>
                                     {% if negocio.pessoa.etiquetas %}
                                     <div class="mt-2 flex flex-wrap gap-1">
                                         {% for etiqueta in negocio.pessoa.etiquetas %}
@@ -135,7 +140,7 @@
                                 {% if not negocio.user_id %}
                                     <span class="text-[10px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-md font-bold tracking-wide">Piscina</span>
                                     {% if not current_user.is_admin %}
-                                    <button onclick="atribuirNegocio({{ negocio.id }}, {{ current_user.id }}); event.stopPropagation();" class="text-[10px] bg-brand-500 hover:bg-brand-600 text-white px-2 py-1 rounded-md shadow-sm transition-colors font-medium">Assumir</button>
+                                    <button onclick="atribuirNegocio({{ negocio.id }}, {{ current_user.id }}); event.stopPropagation();" class="min-h-10 text-xs bg-brand-500 hover:bg-brand-600 text-white px-3 py-2 rounded-md shadow-sm transition-colors font-medium">Assumir</button>
                                     {% endif %}
                                 {% else %}
                                     <div class="flex items-center text-[10px] text-slate-500 font-medium">
@@ -145,7 +150,7 @@
                                 {% endif %}
                                 
                                 {% if current_user.is_admin %}
-                                <select onchange="atribuirNegocio({{ negocio.id }}, this.value); event.stopPropagation();" onclick="event.stopPropagation();" class="text-[10px] border border-slate-200 rounded-md py-1 px-2 text-slate-600 bg-slate-50 focus:ring-1 focus:ring-brand-500 font-medium outline-none">
+                                <select onchange="atribuirNegocio({{ negocio.id }}, this.value); event.stopPropagation();" onclick="event.stopPropagation();" class="min-h-10 max-w-[145px] text-xs border border-slate-200 rounded-md py-2 px-2 text-slate-600 bg-slate-50 focus:ring-1 focus:ring-brand-500 font-medium outline-none">
                                     <option value="">Ninguém</option>
                                     {% for u in users %}
                                     <option value="{{ u.id }}" {% if negocio.user_id == u.id %}selected{% endif %}>{{ u.username }}</option>
@@ -329,8 +334,8 @@
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-3 pointer-events-none"></div>
 
     <!-- BARRA LATERAL DE CHAT -->
-    <aside id="chat-sidebar" class="fixed top-0 right-0 h-full w-[420px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.03)] transform translate-x-full transition-transform duration-300 flex flex-col z-30 border-l border-slate-100">
-        <div class="h-20 px-6 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-100 z-10">
+    <aside id="chat-sidebar" class="fixed top-0 right-0 h-full w-full max-w-[420px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.03)] transform translate-x-full transition-transform duration-300 flex flex-col z-30 border-l border-slate-100">
+        <div class="min-h-20 px-4 md:px-6 flex justify-between items-center gap-2 bg-white/80 backdrop-blur-md border-b border-slate-100 z-10">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 font-bold shadow-inner">
                     <span id="chat-inicial">C</span>
@@ -341,7 +346,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <button id="encerrar-atendimento" type="button" onclick="encerrarConversa()" disabled class="rounded-lg bg-red-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40">
+                <button id="encerrar-atendimento" type="button" onclick="encerrarConversa()" disabled class="min-h-10 rounded-lg bg-red-500 px-2.5 md:px-4 py-2 text-xs md:text-sm font-bold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40">
                     Encerrar Conversa
                 </button>
                 <button type="button" onclick="fecharChat()" aria-label="Fechar conversa" class="text-slate-400 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 p-2 rounded-full transition-colors">
@@ -370,9 +375,9 @@
             </div>
         </div>
 
-        <div id="chat-messages" class="flex-1 p-6 overflow-y-auto bg-slate-50 flex flex-col space-y-4"></div>
+        <div id="chat-messages" class="min-h-0 flex-1 p-4 md:p-6 overflow-y-auto bg-slate-50 flex flex-col space-y-4"></div>
 
-        <div class="p-5 bg-white border-t border-slate-100 flex flex-col">
+        <div class="p-3 md:p-5 bg-white border-t border-slate-100 flex flex-col">
             <div class="flex items-center space-x-2 text-xs text-slate-400 mb-3 px-2">
                 <input type="checkbox" id="usar-assinatura" checked class="rounded border-slate-300 text-brand-500 focus:ring-brand-500 cursor-pointer w-3.5 h-3.5"> 
                 <label for="usar-assinatura" class="cursor-pointer font-medium hover:text-slate-600 transition-colors">Assinatura automática (*{{ current_user.username }}*)</label>
@@ -383,13 +388,23 @@
                 <button onclick="removerAnexo()" class="text-brand-700 hover:text-red-500 font-bold bg-white w-5 h-5 rounded-full flex items-center justify-center shadow-sm">✕</button>
             </div>
 
-            <div class="flex space-x-3 items-center bg-slate-50 border border-slate-200 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300 transition-all">
-                <label class="cursor-pointer text-slate-400 hover:text-brand-500 transition-colors p-2.5 rounded-xl hover:bg-white shadow-sm">
+            <div class="flex gap-1.5 md:gap-3 items-center bg-slate-50 border border-slate-200 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300 transition-all">
+                <label id="chat-attachment-control" class="cursor-pointer text-slate-400 hover:text-brand-500 transition-colors p-2.5 rounded-xl hover:bg-white shadow-sm">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                     <input type="file" id="file-input" class="hidden" onchange="prepararArquivo(event)">
                 </label>
-                <input type="text" id="chat-input" placeholder="Escreva uma mensagem..." class="flex-1 bg-transparent border-none px-2 text-sm focus:ring-0 text-slate-700 placeholder-slate-400" onkeypress="if(event.key === 'Enter') enviarMensagem()">
-                <button onclick="enviarMensagem()" class="bg-brand-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-brand-700 transition-colors shadow-sm">
+                <input type="text" id="chat-input" placeholder="Escreva uma mensagem..." class="min-w-0 flex-1 bg-transparent border-none px-1 md:px-2 text-sm focus:ring-0 text-slate-700 placeholder-slate-400" onkeypress="if(event.key === 'Enter') enviarMensagem()">
+                <div id="recording-controls" class="hidden min-w-0 flex-1 items-center justify-end gap-2" aria-live="polite">
+                    <span class="flex items-center gap-1.5 text-xs font-semibold tabular-nums text-red-600">
+                        <span class="h-2 w-2 animate-pulse rounded-full bg-red-500"></span>
+                        <span id="recording-timer">00:00</span>
+                    </span>
+                    <button id="cancel-recording" type="button" onclick="cancelarGravacaoAudio()" aria-label="Cancelar gravação" class="min-h-10 rounded-lg px-2 text-xs font-semibold text-slate-600 hover:bg-slate-200">Cancelar</button>
+                </div>
+                <button id="record-audio-button" type="button" onclick="alternarGravacaoAudio()" aria-label="Gravar áudio" aria-pressed="false" class="min-h-10 min-w-10 rounded-xl flex items-center justify-center bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-sm">
+                    <svg id="record-audio-icon" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18.5a6.5 6.5 0 006.5-6.5V9m-13 0v3a6.5 6.5 0 006.5 6.5m0 0V22m-4 0h8M12 15a3 3 0 003-3V5a3 3 0 00-6 0v7a3 3 0 003 3z"/></svg>
+                </button>
+                <button id="send-message-button" type="button" onclick="enviarMensagem()" aria-label="Enviar mensagem" class="bg-brand-600 text-white w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center hover:bg-brand-700 transition-colors shadow-sm">
                     <svg class="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                 </button>
             </div>
@@ -405,6 +420,15 @@
         let consultandoMensagensNovas = false;
         let qrInterval = null;
         let arquivoSelecionado = null;
+        let gravadorAudio = null;
+        let streamAudio = null;
+        let partesAudio = [];
+        let inicioGravacaoAudio = null;
+        let temporizadorGravacaoAudio = null;
+        let descartarGravacaoAudio = false;
+        let finalizandoGravacaoAudio = false;
+        let enviandoAudio = false;
+        let solicitandoMicrofone = false;
         const nomeOperadorAtual = {{ current_user.username|tojson }};
 
         function abrirModalLead() {
@@ -456,6 +480,7 @@
             document.querySelectorAll('.sortable-col').forEach(coluna => {
                 new Sortable(coluna, {
                     group: 'kanban', animation: 200, ghostClass: 'opacity-40', dragClass: 'shadow-2xl',
+                    delay: 150, delayOnTouchOnly: true, touchStartThreshold: 5,
                     onEnd: async function (evt) {
                         const negocioId = evt.item.getAttribute('data-negocio-id');
                         const novaEtapaId = evt.to.getAttribute('data-etapa-id');
@@ -495,6 +520,7 @@
         // 2. CHAT E MULTIMÉDIA
         // ==========================================
         async function abrirChat(pessoaId, nome, telefone) {
+            if (gravadorAudio) cancelarGravacaoAudio();
             pessoaAtualId = pessoaId; 
             telefoneAtual = telefone;
             ultimoIdMensagem = 0;
@@ -509,6 +535,7 @@
         }
 
         function fecharChat() { 
+            if (gravadorAudio) cancelarGravacaoAudio();
             document.getElementById('chat-sidebar').classList.add('translate-x-full'); 
             pessoaAtualId = null; 
             ultimoIdMensagem = 0;
@@ -778,6 +805,199 @@
             document.getElementById('file-input').value = ''; 
             document.getElementById('file-preview').classList.remove('flex'); 
             document.getElementById('file-preview').classList.add('hidden'); 
+        }
+
+        function atualizarInterfaceGravacaoAudio(gravando) {
+            const botao = document.getElementById('record-audio-button');
+            const icone = document.getElementById('record-audio-icon');
+            const controles = document.getElementById('recording-controls');
+            botao.setAttribute('aria-pressed', String(gravando));
+            botao.setAttribute('aria-label', gravando ? 'Parar e enviar gravação' : 'Gravar áudio');
+            botao.classList.toggle('bg-red-500', gravando);
+            botao.classList.toggle('text-white', gravando);
+            botao.classList.toggle('hover:bg-red-600', gravando);
+            botao.classList.toggle('bg-slate-200', !gravando);
+            botao.classList.toggle('text-slate-700', !gravando);
+            botao.classList.toggle('hover:bg-slate-300', !gravando);
+            icone.innerHTML = gravando
+                ? '<rect x="6" y="6" width="12" height="12" rx="2" stroke-width="2.5"/>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18.5a6.5 6.5 0 006.5-6.5V9m-13 0v3a6.5 6.5 0 006.5 6.5m0 0V22m-4 0h8M12 15a3 3 0 003-3V5a3 3 0 00-6 0v7a3 3 0 003 3z"/>';
+            document.getElementById('recording-timer').textContent = '00:00';
+            document.getElementById('chat-input').classList.toggle('hidden', gravando);
+            document.getElementById('chat-attachment-control').classList.toggle('hidden', gravando);
+            document.getElementById('send-message-button').classList.toggle('hidden', gravando);
+            controles.classList.toggle('hidden', !gravando);
+            controles.classList.toggle('flex', gravando);
+        }
+
+        function atualizarTemporizadorGravacaoAudio() {
+            const segundos = Math.floor((Date.now() - inicioGravacaoAudio) / 1000);
+            const minutos = Math.floor(segundos / 60).toString().padStart(2, '0');
+            const restoSegundos = (segundos % 60).toString().padStart(2, '0');
+            document.getElementById('recording-timer').textContent = `${minutos}:${restoSegundos}`;
+        }
+
+        async function alternarGravacaoAudio() {
+            if (gravadorAudio && gravadorAudio.state === 'recording') {
+                pararGravacaoAudio(false);
+                return;
+            }
+            if (enviandoAudio || solicitandoMicrofone || finalizandoGravacaoAudio) return;
+            if (!pessoaAtualId) {
+                mostrarNotificacao('Gravação de áudio', 'Abra uma conversa antes de gravar.');
+                return;
+            }
+            if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+                mostrarNotificacao('Gravação indisponível', 'Este navegador não suporta gravação de áudio.');
+                return;
+            }
+
+            const pessoaId = pessoaAtualId;
+            solicitandoMicrofone = true;
+            document.getElementById('record-audio-button').disabled = true;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (pessoaAtualId !== pessoaId) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                const tiposSuportados = [
+                    'audio/ogg;codecs=opus',
+                    'audio/webm;codecs=opus',
+                    'audio/ogg',
+                    'audio/webm',
+                    'audio/mp4',
+                ];
+                const tipoAudio = typeof MediaRecorder.isTypeSupported === 'function'
+                    ? tiposSuportados.find(tipo => MediaRecorder.isTypeSupported(tipo))
+                    : null;
+                streamAudio = stream;
+                const recorder = tipoAudio
+                    ? new MediaRecorder(stream, { mimeType: tipoAudio })
+                    : new MediaRecorder(stream);
+                gravadorAudio = recorder;
+                partesAudio = [];
+                descartarGravacaoAudio = false;
+                recorder.addEventListener('dataavailable', evento => {
+                    if (evento.data.size > 0) partesAudio.push(evento.data);
+                });
+                recorder.addEventListener('error', () => {
+                    descartarGravacaoAudio = true;
+                    if (recorder.state === 'recording') {
+                        pararGravacaoAudio(true);
+                    } else {
+                        if (streamAudio) streamAudio.getTracks().forEach(track => track.stop());
+                        streamAudio = null;
+                        gravadorAudio = null;
+                        partesAudio = [];
+                        finalizandoGravacaoAudio = false;
+                        clearInterval(temporizadorGravacaoAudio);
+                        temporizadorGravacaoAudio = null;
+                        atualizarInterfaceGravacaoAudio(false);
+                        document.getElementById('record-audio-button').disabled = enviandoAudio;
+                    }
+                    mostrarNotificacao('Erro na gravação', 'Não foi possível gravar o áudio.');
+                }, { once: true });
+                recorder.addEventListener('stop', () => {
+                    if (gravadorAudio !== recorder) return;
+                    const descartar = descartarGravacaoAudio;
+                    const blob = new Blob(partesAudio, { type: recorder.mimeType || tipoAudio || 'audio/webm' });
+                    if (streamAudio) streamAudio.getTracks().forEach(track => track.stop());
+                    streamAudio = null;
+                    gravadorAudio = null;
+                    partesAudio = [];
+                    descartarGravacaoAudio = false;
+                    clearInterval(temporizadorGravacaoAudio);
+                    temporizadorGravacaoAudio = null;
+                    atualizarInterfaceGravacaoAudio(false);
+                    if (descartar) {
+                        finalizandoGravacaoAudio = false;
+                        document.getElementById('record-audio-button').disabled = enviandoAudio;
+                        return;
+                    }
+                    if (!blob.size) {
+                        finalizandoGravacaoAudio = false;
+                        document.getElementById('record-audio-button').disabled = enviandoAudio;
+                        mostrarNotificacao('Gravação vazia', 'Grave uma mensagem antes de enviar.');
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onerror = () => {
+                        finalizandoGravacaoAudio = false;
+                        document.getElementById('record-audio-button').disabled = enviandoAudio;
+                        mostrarNotificacao('Erro no áudio', 'Não foi possível preparar a gravação para envio.');
+                    };
+                    reader.onload = () => {
+                        if (typeof reader.result !== 'string') {
+                            finalizandoGravacaoAudio = false;
+                            document.getElementById('record-audio-button').disabled = enviandoAudio;
+                            mostrarNotificacao('Erro no áudio', 'A gravação não pôde ser convertida para envio.');
+                            return;
+                        }
+                        enviarAudioGravado(reader.result, pessoaId);
+                    };
+                    reader.readAsDataURL(blob);
+                }, { once: true });
+                inicioGravacaoAudio = Date.now();
+                recorder.start();
+                atualizarInterfaceGravacaoAudio(true);
+                temporizadorGravacaoAudio = setInterval(atualizarTemporizadorGravacaoAudio, 250);
+            } catch (erro) {
+                if (streamAudio) streamAudio.getTracks().forEach(track => track.stop());
+                streamAudio = null;
+                gravadorAudio = null;
+                atualizarInterfaceGravacaoAudio(false);
+                mostrarNotificacao('Não foi possível gravar', erro.name === 'NotAllowedError'
+                    ? 'Permita o acesso ao microfone nas definições do navegador.'
+                    : erro.message || 'Verifique o acesso ao microfone e tente novamente.');
+            } finally {
+                solicitandoMicrofone = false;
+                document.getElementById('record-audio-button').disabled = enviandoAudio;
+            }
+        }
+
+        function pararGravacaoAudio(descartar) {
+            if (!gravadorAudio || gravadorAudio.state === 'inactive') return;
+            descartarGravacaoAudio = descartar;
+            finalizandoGravacaoAudio = true;
+            document.getElementById('record-audio-button').disabled = true;
+            clearInterval(temporizadorGravacaoAudio);
+            temporizadorGravacaoAudio = null;
+            gravadorAudio.stop();
+        }
+
+        function cancelarGravacaoAudio() {
+            pararGravacaoAudio(true);
+        }
+
+        async function enviarAudioGravado(audioBase64, pessoaId) {
+            enviandoAudio = true;
+            const botao = document.getElementById('record-audio-button');
+            botao.disabled = true;
+            try {
+                const response = await fetch('/api/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pessoa_id: pessoaId,
+                        texto: '',
+                        media: audioBase64,
+                        fileName: 'mensagem-de-voz',
+                        voice_note: true,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.erro || 'Não foi possível enviar o áudio.');
+                if (pessoaAtualId === pessoaId) await consultarMensagensNovas();
+            } catch (erro) {
+                mostrarNotificacao('Erro ao enviar áudio', erro.message);
+            } finally {
+                enviandoAudio = false;
+                finalizandoGravacaoAudio = false;
+                botao.disabled = false;
+            }
         }
 
         async function enviarMensagem() {

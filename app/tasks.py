@@ -547,6 +547,35 @@ def _processar_payload(payload):
     if pessoa.status_atendimento == 'humano':
         return 'human'
 
+    if (atendimento_reaberto or eh_novo_contato) and empresa.usar_menu_inicial:
+        _simular_digitacao(instancia, telefone, 1.2)
+        _enviar_resposta(
+            empresa.id, pessoa.id, telefone, instancia, _montar_texto_menu(empresa, pessoa)
+        )
+        return 'menu_sent'
+
+    if pessoa.status_atendimento == 'menu':
+        texto_opcao = (texto_recebido or '').strip()
+        etapa = None
+        if texto_opcao.isdecimal():
+            etapa = Etapa.query.filter_by(
+                empresa_id=empresa.id, exibir_no_menu=True, numero_menu=int(texto_opcao)
+            ).first()
+        if etapa:
+            _simular_digitacao(instancia, telefone, 1.2)
+            negocio = Negocio.query.filter_by(
+                empresa_id=empresa.id, pessoa_id=pessoa.id
+            ).order_by(Negocio.id).first()
+            if negocio:
+                negocio.etapa_id = etapa.id
+            _transferir_para_humano(
+                empresa, pessoa, telefone, instancia, empresa.mensagem_transbordo
+            )
+            return 'transferred'
+
+        pessoa.status_atendimento = 'ia'
+        db.session.commit()
+
     # Respostas configuradas são determinísticas e não dependem de serviços de IA.
     regras = RespostaAutomatica.query.filter_by(
         empresa_id=empresa.id
@@ -561,36 +590,6 @@ def _processar_payload(payload):
             resposta_pronta = f'{saudacao}\n\n{resposta_pronta}'
         _enviar_resposta(empresa.id, pessoa.id, telefone, instancia, resposta_pronta)
         return 'faq_simulated_replied'
-
-    if (atendimento_reaberto or eh_novo_contato) and empresa.usar_menu_inicial:
-        _simular_digitacao(instancia, telefone, 1.2)
-        _enviar_resposta(
-            empresa.id, pessoa.id, telefone, instancia, _montar_texto_menu(empresa, pessoa)
-        )
-        return 'menu_sent'
-
-    if pessoa.status_atendimento == 'menu':
-        etapa = None
-        texto_opcao = (texto_recebido or '').strip()
-        if texto_opcao.isdecimal():
-            etapa = Etapa.query.filter_by(
-                empresa_id=empresa.id, exibir_no_menu=True, numero_menu=int(texto_opcao)
-            ).first()
-        _simular_digitacao(instancia, telefone, 1.2)
-        if etapa:
-            negocio = Negocio.query.filter_by(
-                empresa_id=empresa.id, pessoa_id=pessoa.id
-            ).order_by(Negocio.id).first()
-            if negocio:
-                negocio.etapa_id = etapa.id
-            _transferir_para_humano(
-                empresa, pessoa, telefone, instancia, empresa.mensagem_transbordo
-            )
-            return 'transferred'
-        _enviar_resposta(
-            empresa.id, pessoa.id, telefone, instancia, _montar_texto_menu(empresa, pessoa)
-        )
-        return 'menu'
 
     if pessoa.status_atendimento != 'ia' or not pessoa.ia_ativa:
         return 'ignored'

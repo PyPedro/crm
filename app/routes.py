@@ -1100,12 +1100,45 @@ def atualizar_assistente_conversa(pessoa_id):
 @bp.route('/api/send_message', methods=['POST'])
 @login_required
 def send_message():
-    dados = request.json
+    dados = request.get_json(silent=True) or {}
     pessoa = Pessoa.query.filter_by(id=dados.get('pessoa_id'), empresa_id=current_user.empresa_id).first()
     if not pessoa:
         return jsonify({"erro": "Não encontrado"}), 404
     texto, media_b64 = dados.get('texto', ''), dados.get('media')
     api_url, api_key, instance_name = current_app.config['EVOLUTION_API_URL'], current_app.config['EVOLUTION_API_KEY'], current_user.empresa.instancia_whatsapp
+    if dados.get('voice_note') is True:
+        if not isinstance(media_b64, str) or not media_b64.startswith('data:audio/'):
+            return jsonify({"erro": "Áudio de voz inválido."}), 400
+        try:
+            resposta = requests.post(
+                f"{api_url.rstrip('/')}/message/sendWhatsAppAudio/{instance_name}",
+                headers={"apikey": api_key},
+                json={"number": str(pessoa.telefone), "audio": media_b64},
+                timeout=30,
+            )
+            resposta.raise_for_status()
+        except requests.RequestException:
+            current_app.logger.exception(
+                'Falha ao enviar áudio de voz pela Evolution API para pessoa %s.',
+                pessoa.id,
+            )
+            return jsonify({"erro": "Falha ao enviar áudio de voz pela Evolution API."}), 502
+
+        db.session.add(Mensagem(
+            empresa_id=current_user.empresa_id,
+            pessoa_id=pessoa.id,
+            mensagem=json.dumps({
+                "type": "audio",
+                "content": media_b64,
+                "caption": texto,
+                "voice_note": True,
+            }),
+            tipo='outbound',
+            data_envio=hora_atual_br(),
+        ))
+        db.session.commit()
+        return jsonify({"status": "sucesso"})
+
     if media_b64:
         mimetype = media_b64.split(",", 1)[0].split(":")[1].split(";")[0]
         mtype = 'image' if 'image' in mimetype else 'audio' if 'audio' in mimetype else 'video' if 'video' in mimetype else 'document'
